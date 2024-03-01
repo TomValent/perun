@@ -8,6 +8,7 @@ import json
 import click
 import subprocess
 
+from typing import Any
 from perun.collect.trace.strategy import extract_configuration
 from perun.utils import log as perun_log
 from perun.collect.trace.configuration import Configuration
@@ -183,7 +184,7 @@ def teardown(**kwargs):
     return CollectStatus.OK, "", dict(kwargs)
 
 
-def web(ctx, **kwargs):
+def web(ctx: click.Context, **kwargs: Any) -> None:
     """Generates `web` performance profile, capturing different metrics such as latency, request
     count or errors occurrences
     """
