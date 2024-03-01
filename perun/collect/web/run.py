@@ -64,6 +64,7 @@ def collect(**kwargs):
     command = kwargs["command"]
     timeout = kwargs["timeout"]
     project_port = kwargs["port"]
+    profiler_port = "9000"
 
     with processes.nonblocking_subprocess(
         "yarn " + command,
@@ -77,12 +78,12 @@ def collect(**kwargs):
                 {"cwd": profiler_path}
         ) as prof_process:
             perun_log.minor_info("Warm up phase...")
-            server_url = "http://localhost:9000"
+            server_url = "http://localhost:" + profiler_port
             if wait_until_server_starts(server_url):
                 perun_log.minor_info("Collect phase...")
-                sleep(timeout)
 
-                kill_processes([project_port, 9000])
+                sleep(timeout)
+                kill_processes([project_port, profiler_port])
 
                 perun_log.minor_info("Collecting finished...")
             else:
@@ -141,12 +142,10 @@ def after(**kwargs):
     metrics_data = []
     trace_data = []
     parser = Parser()
-    order = 0
 
     with open(metrics, 'r') as metrics_file:
         for line in metrics_file:
-            order += 1
-            parsed_line = parser.parse_metric(line, order)
+            parsed_line = parser.parse_metric(line)
             metrics_data.append(parsed_line)
 
     # with open(trace, 'r') as trace_file:
@@ -166,12 +165,10 @@ def after(**kwargs):
                     "resources": [
                         {
                             "amount": value,
-                            "uid": "",
-                            "order": order,
-                            "subtype": key,
-                            "type": "web",
+                            "uid": route,
+                            "type": key,
                         }
-                        for (order, key, value) in metrics_data
+                        for (key, value, route) in metrics_data
                     ]
                 }
             }
@@ -189,6 +186,8 @@ def teardown(**kwargs):
                     dict of kwargs (possibly with some new values))
     """
     perun_log.minor_info("Teardown phase...")
+
+    kill_processes([8000, 9000]) #git fetch upstream # collect -> vetva ktrace prototype -> parametrizacia #jinja2 api v docs
 
     return CollectStatus.OK, "", dict(kwargs)
 

@@ -3,7 +3,7 @@ The collected data are suitable for further postprocessing using
 the regression analysis and visualization by scatter plots.
 """
 
-COLLECTOR_TYPE = "web"
+COLLECTOR_TYPE = "mixed"
 COLLECTOR_DEFAULT_UNITS = {
     "page_requests":           "",
     "error_count":             "",
