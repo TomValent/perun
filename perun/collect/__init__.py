@@ -61,5 +61,5 @@ def lazy_get_cli_commands() -> list[Callable[..., Any]]:
         memory_run.memory,
         time_run.time,
         trace_run.trace,
-        # web_run.web,
+        web_run.web,
     ]
