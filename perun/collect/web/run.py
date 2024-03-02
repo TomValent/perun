@@ -184,6 +184,7 @@ def teardown(**kwargs):
     return CollectStatus.OK, "", dict(kwargs)
 
 
+@click.command()
 def web(ctx: click.Context, **kwargs: Any) -> None:
     """Generates `web` performance profile, capturing different metrics such as latency, request
     count or errors occurrences
