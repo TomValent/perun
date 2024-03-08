@@ -3,6 +3,7 @@ perun_collect_web_dir = perun_collect_dir / 'web'
 perun_collect_web_files = files(
     '__init__.py',
     'run.py',
+    'BuildException.py'
 )
 
 py3.install_sources(

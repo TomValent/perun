@@ -5,41 +5,21 @@ Specifies before, collect, after and teardown functions to perform the initializ
 collection and postprocessing of collection data.
 """
 import json
+import os
+import psutil
+import requests
 import click
 import subprocess
-
-from typing import Any
-from perun.collect.trace.strategy import extract_configuration
-from perun.utils import log as perun_log
-from perun.collect.trace.configuration import Configuration
-from perun.collect.trace.values import (
-    check,
-    GLOBAL_DEPENDENCIES,
-)
-
 import perun.logic.runner as runner
-import perun.utils.metrics as metrics
+
+from perun.collect.web.BuildException import BuildException
+from perun.utils import log as perun_log
+from time import sleep
+from typing import Any, List
+from perun.utils.external import processes
 from perun.utils.structs import CollectStatus
 
 
-@click.command()
-@click.option(
-    "--path",
-    "-p",
-    type=str,
-    required=True,
-    default="",
-    help="Path to your project to profile"
-)
-@click.option(
-    "--command",
-    "-c",
-    type=str,
-    required=True,
-    default="start",
-    help="Script name to start your project.\n"
-         "For example: 'start' => 'yarn start'"
-)
 def before(executable, **kwargs):
     """Validates, initializes and normalizes the collection configuration.
 
@@ -51,60 +31,23 @@ def before(executable, **kwargs):
     """
 
     perun_log.minor_info("Pre-processing phase...")
+    perun_log.minor_info("Checking if target project is built...")
 
-    # Check if we run in a workload generator batch and update metrics accordingly
-    if executable.workload != executable.origin_workload:
-        metrics.Metrics.add_sub_id(executable.workload)
+    project_path = kwargs["proj"]
 
-    project_path = kwargs["path"]
-    command = kwargs["command"]
+    build_dir = os.path.join(project_path, "build")
+    dist_dir = os.path.join(project_path, "dist")
+    out_dir = os.path.join(project_path, "out")
 
-    try:
-        subprocess.run(["yarn", command], cwd=project_path)
-    except subprocess.CalledProcessError as e:
-        perun_log.error(f"Could not execute start command: yarn {command}")
-
-    # Validate and normalize collection parameters
-    config = Configuration(executable, **kwargs)
-
-    kwargs["opened_resources"].append(config)
-    kwargs["config"] = config
-    kwargs["probes"] = config.probes
-    config.engine_factory()
-
-    # Check all the required dependencies
-    check(GLOBAL_DEPENDENCIES)
-    config.engine.check_dependencies()
-
-    # Extract and / or post-process the collect configuration
-    extract_configuration(config.engine, kwargs["probes"])
-    if not kwargs["probes"].func and not kwargs["probes"].usdt:
-        msg = (
-            "No profiling probes created (due to invalid specification, failed extraction or "
-            "filtering)"
+    if not os.path.exists(build_dir) and not os.path.exists(dist_dir) and not os.path.exists(out_dir):
+        raise BuildException(
+            "Build directory does not, please build your application before profiling.\n"
+            "Supported build directories are 'build', 'dist', 'out'\n"
         )
-        return CollectStatus.ERROR, msg, dict(kwargs)
-
-    # Set the variables for optimization methods
-    kwargs["binary"] = config.binary
-
-    # Cleanup the kwargs and log all the dictionaries
-    perun_log.minor_info("before::kwargs", json.dumps(kwargs))
-    perun_log.minor_info("before::kwargs::config", json.dumps(config.__dict__))
-    perun_log.minor_info("before::kwargs::probes", kwargs["probes"].__dict__)
 
     return CollectStatus.OK, "", dict(kwargs)
 
 
-@click.command()
-@click.option(
-    "--path",
-    "-p",
-    type=str,
-    required=True,
-    default="",
-    help="Path to OpenTelemetry profiler script"
-)
 def collect(**kwargs):
     """Assembles the engine collect program according to input parameters and collection strategy.
     Runs the created collection program and the profiled command.
@@ -115,29 +58,67 @@ def collect(**kwargs):
                     dict of kwargs (possibly with some new values))
     """
 
-    perun_log.minor_info("Collect phase...")
-    config = kwargs["config"]
+    project_path = kwargs["proj"]
+    command = kwargs["command"]
+    timeout = kwargs["timeout"]
 
-    metrics.add_metric("page_requests", 0)
-    metrics.add_metric("error_count", 0)
-    metrics.add_metric("error_code_count", 0)
-    metrics.add_metric("error_message_count", 0)
-    metrics.add_metric("memory_usage_counter", 0)
-    metrics.add_metric("request_latency_summary", 0)
+    with processes.nonblocking_subprocess(
+        "yarn " + command,
+            {"cwd": project_path}
+    ) as project_process:
+        profiler_path = kwargs["otp"]
+        command = "start"
 
-    profiler_path = kwargs["path"]
-    command = "start"
+        with processes.nonblocking_subprocess(
+                "yarn " + command + " --silent",
+                {"cwd": profiler_path}
+        ) as prof_process:
+            perun_log.minor_info("Warm up phase...")
+            server_url = "http://localhost:9000"
+            if wait_until_server_starts(server_url):
+                perun_log.minor_info("Collect phase...")
+                sleep(timeout)
 
-    try:
-        subprocess.run(["yarn", command], cwd=profiler_path)
-    except subprocess.CalledProcessError as e:
-        perun_log.error(f"Could not execute start command: yarn {command}")
+                kill_processes([8000, 9000])
 
-    # Assemble the collection program according to the parameters
-    metrics.add_metric("func_count", len(config.probes.func.keys()))
-    config.engine.assemble_collect_program(**kwargs)
+                perun_log.minor_info("Collecting finished...")
+            else:
+                perun_log.error("Could not start profiler...")
 
     return CollectStatus.OK, "", dict(kwargs)
+
+
+def kill_processes(ports: List[int]) -> None:
+    """Terminate processes listening on specified ports after timeout.
+
+    :param ports: List of integers representing ports on which processes are running.
+    :return: None
+    """
+
+    for port in ports:
+        for conn in psutil.net_connections():
+            if conn.laddr.port == port and conn.status == 'LISTEN':
+                subprocess.run(["kill", "-9", str(conn.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def wait_until_server_starts(url: str, max_attempts: int = 10, wait_time: int = 1) -> bool:
+    """Wait until a server at the specified URL starts responding.
+
+    :param url: The URL of the server to wait for.
+    :param max_attempts: The maximum number of attempts to make before giving up. Default is 10.
+    :param wait_time: The time to wait (in seconds) between attempts. Default is 1.
+    :return: True if the server started within the specified attempts, False otherwise.
+    """
+
+    for _ in range(max_attempts):
+        try:
+            response = requests.get(url)
+            if response.status_code == 200:
+                return True
+        except requests.ConnectionError:
+            pass
+        sleep(wait_time)
+    return False
 
 
 def after(**kwargs):
@@ -150,7 +131,22 @@ def after(**kwargs):
     """
     perun_log.minor_info("Post-processing phase... ")
 
+    log_dir = kwargs["otp"]
+    metrics = os.path.join(log_dir, "data/metrics/metrics.log")
+    trace = os.path.join(log_dir, "data/tracing/tracing.log")
 
+    metrics_data = []
+    trace_data = []
+
+    with open(metrics, 'r') as metrics_file:
+        for line in metrics_file:
+            parsed_line = json.loads(line)
+            metrics_data.append(parsed_line)
+
+    with open(trace, 'r') as trace_file:
+        for line in trace_file:
+            parsed_line = json.loads(line)
+            trace_data.append(parsed_line)
 
     perun_log.minor_info("Data processing finished.")
 
@@ -168,23 +164,44 @@ def teardown(**kwargs):
     """
     perun_log.minor_info("Teardown phase...")
 
-    # The Configuration object can be directly in kwargs or the resources list
-    config = None
-    if "config" in kwargs:
-        config = kwargs["config"]
-    elif kwargs["opened_resources"]:
-        config = kwargs["opened_resources"][0]
-        kwargs["config"] = config
-
-    # Cleanup all the engine related resources
-    # Check that the engine was actually constructed
-    if config is not None and not isinstance(config.engine, str):
-        config.engine.cleanup(**kwargs)
-
     return CollectStatus.OK, "", dict(kwargs)
 
 
 @click.command()
+@click.option(
+    "--otp",
+    "-o",
+    type=str,
+    required=True,
+    default="",
+    help="Path to the OpenTelemetry profiler script"
+)
+@click.option(
+    "--proj",
+    "-p",
+    type=str,
+    required=True,
+    default="",
+    help="Path to the project to be profiled"
+)
+@click.option(
+    "--command",
+    "-c",
+    type=str,
+    required=True,
+    default="start",
+    help="Script name to start your project.\n"
+         "For example: 'start' => 'yarn start'"
+)
+@click.option(
+    "--timeout",
+    "-t",
+    type=int,
+    required=False,
+    default=60,
+    help="Timeout for the runtime of profiling in seconds"
+)
+@click.pass_context
 def web(ctx: click.Context, **kwargs: Any) -> None:
     """Generates `web` performance profile, capturing different metrics such as latency, request
     count or errors occurrences
