@@ -4,23 +4,26 @@ TypeScript/JavaScript web applications
 Specifies before, collect, after and teardown functions to perform the initialization,
 collection and postprocessing of collection data.
 """
-import json
+
 import os
+import sys
+import click
 import psutil
 import requests
-import click
 import subprocess
 import perun.logic.runner as runner
 
-from perun.collect.web.BuildException import BuildException
-from perun.utils import log as perun_log
 from time import sleep
 from typing import Any, List
+from datetime import datetime
+from perun.utils import log as perun_log
 from perun.utils.external import processes
-from perun.utils.structs import CollectStatus
+from perun.collect.web.parser import Parser
+from perun.utils.structs import CollectStatus, Executable
+from perun.collect.web.build_exception import BuildException
 
 
-def before(executable, **kwargs):
+def before(executable: Executable, **kwargs):
     """Validates, initializes and normalizes the collection configuration.
 
     :param Executable executable: full collection command with arguments and workload
@@ -83,7 +86,7 @@ def collect(**kwargs):
 
                 perun_log.minor_info("Collecting finished...")
             else:
-                perun_log.error("Could not start profiler...")
+                perun_log.error("Could not start profiler or target project...")
 
     return CollectStatus.OK, "", dict(kwargs)
 
@@ -137,20 +140,43 @@ def after(**kwargs):
 
     metrics_data = []
     trace_data = []
+    parser = Parser()
+    order = 0
 
     with open(metrics, 'r') as metrics_file:
         for line in metrics_file:
-            parsed_line = json.loads(line)
+            order += 1
+            parsed_line = parser.parse_metric(line, order)
             metrics_data.append(parsed_line)
 
-    with open(trace, 'r') as trace_file:
-        for line in trace_file:
-            parsed_line = json.loads(line)
-            trace_data.append(parsed_line)
+    # with open(trace, 'r') as trace_file:
+    #     for line in trace_file:
+    #         parsed_line = parser.parse_trace(line)
+    #         trace_data.append(parsed_line)
 
     perun_log.minor_info("Data processing finished.")
 
-    return CollectStatus.OK, "", dict(kwargs)
+    return (
+        CollectStatus.OK,
+        "",
+        {
+            "profile": {
+                "global": {
+                    "timestamp": datetime.now().timestamp(),
+                    "resources": [
+                        {
+                            "amount": value,
+                            "uid": sys.argv,
+                            "order": order,
+                            "subtype": key,
+                            "type": "web",
+                        }
+                        for (order, key, value) in metrics_data
+                    ]
+                }
+            }
+        }
+    )
 
 
 def teardown(**kwargs):
