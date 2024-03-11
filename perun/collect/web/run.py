@@ -6,7 +6,6 @@ collection and postprocessing of collection data.
 """
 
 import os
-import sys
 import click
 import psutil
 import requests
@@ -64,6 +63,7 @@ def collect(**kwargs):
     project_path = kwargs["proj"]
     command = kwargs["command"]
     timeout = kwargs["timeout"]
+    project_port = kwargs["port"]
 
     with processes.nonblocking_subprocess(
         "yarn " + command,
@@ -82,7 +82,7 @@ def collect(**kwargs):
                 perun_log.minor_info("Collect phase...")
                 sleep(timeout)
 
-                kill_processes([8000, 9000])
+                kill_processes([project_port, 9000])
 
                 perun_log.minor_info("Collecting finished...")
             else:
@@ -166,7 +166,7 @@ def after(**kwargs):
                     "resources": [
                         {
                             "amount": value,
-                            "uid": sys.argv,
+                            "uid": "",
                             "order": order,
                             "subtype": key,
                             "type": "web",
@@ -218,6 +218,12 @@ def teardown(**kwargs):
     default="start",
     help="Script name to start your project.\n"
          "For example: 'start' => 'yarn start'"
+)
+@click.option(
+    "--port",
+    type=int,
+    required=True,
+    help="Port on which project run"
 )
 @click.option(
     "--timeout",
