@@ -142,12 +142,10 @@ def after(**kwargs):
     metrics_data = []
     trace_data = []
     parser = Parser()
-    order = 0
 
     with open(metrics, 'r') as metrics_file:
         for line in metrics_file:
-            order += 1
-            parsed_line = parser.parse_metric(line, order)
+            parsed_line = parser.parse_metric(line)
             metrics_data.append(parsed_line)
 
     # with open(trace, 'r') as trace_file:
