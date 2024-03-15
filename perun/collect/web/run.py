@@ -36,6 +36,7 @@ def before(executable: Executable, **kwargs):
     perun_log.minor_info("Checking if target project is built...")
 
     project_path = kwargs["proj"]
+    kwargs["prof_port"] = 9000
 
     build_dir = os.path.join(project_path, "build")
     dist_dir = os.path.join(project_path, "dist")
@@ -61,33 +62,28 @@ def collect(**kwargs):
     """
 
     project_path = kwargs["proj"]
-    command = kwargs["command"]
+    index_file = kwargs["index"]
     timeout = kwargs["timeout"]
     project_port = kwargs["port"]
-    profiler_port = "9000"
+    profiler_port = kwargs["prof_port"]
+    profiler_path = kwargs["otp"]
+    command = "start"
 
     with processes.nonblocking_subprocess(
-        "yarn " + command,
-            {"cwd": project_path}
-    ) as project_process:
-        profiler_path = kwargs["otp"]
-        command = "start"
+            "yarn " + command + " --silent " + "--path " + project_path + index_file,
+            {"cwd": profiler_path}
+    ) as prof_process:
+        perun_log.minor_info("Warm up phase...")
+        server_url = "http://localhost:" + str(project_port)
+        if wait_until_server_starts(server_url):
+            perun_log.minor_info("Collect phase...")
 
-        with processes.nonblocking_subprocess(
-                "yarn " + command + " --silent",
-                {"cwd": profiler_path}
-        ) as prof_process:
-            perun_log.minor_info("Warm up phase...")
-            server_url = "http://localhost:" + profiler_port
-            if wait_until_server_starts(server_url):
-                perun_log.minor_info("Collect phase...")
+            sleep(timeout)
+            kill_processes([project_port, profiler_port])
 
-                sleep(timeout)
-                kill_processes([project_port, profiler_port])
-
-                perun_log.minor_info("Collecting finished...")
-            else:
-                perun_log.error("Could not start profiler or target project...")
+            perun_log.minor_info("Collecting finished...")
+        else:
+            perun_log.error("Could not start profiler or target project...")
 
     return CollectStatus.OK, "", dict(kwargs)
 
@@ -105,7 +101,7 @@ def kill_processes(ports: List[int]) -> None:
                 subprocess.run(["kill", "-9", str(conn.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def wait_until_server_starts(url: str, max_attempts: int = 10, wait_time: int = 1) -> bool:
+def wait_until_server_starts(url: str, max_attempts: int = 20, wait_time: float = 0.5) -> bool:
     """Wait until a server at the specified URL starts responding.
 
     :param url: The URL of the server to wait for.
@@ -137,21 +133,14 @@ def after(**kwargs):
 
     log_dir = kwargs["otp"]
     metrics = os.path.join(log_dir, "data/metrics/metrics.log")
-    trace = os.path.join(log_dir, "data/tracing/tracing.log")
 
     metrics_data = []
-    trace_data = []
     parser = Parser()
 
     with open(metrics, 'r') as metrics_file:
         for line in metrics_file:
             parsed_line = parser.parse_metric(line)
             metrics_data.append(parsed_line)
-
-    # with open(trace, 'r') as trace_file:
-    #     for line in trace_file:
-    #         parsed_line = parser.parse_trace(line)
-    #         trace_data.append(parsed_line)
 
     perun_log.minor_info("Data processing finished.")
 
@@ -187,7 +176,7 @@ def teardown(**kwargs):
     """
     perun_log.minor_info("Teardown phase...")
 
-    kill_processes([8000, 9000]) #git fetch upstream # collect -> vetva ktrace prototype -> parametrizacia #jinja2 api v docs
+    kill_processes([kwargs["port"], kwargs["prof_port"]])
 
     return CollectStatus.OK, "", dict(kwargs)
 
@@ -210,13 +199,13 @@ def teardown(**kwargs):
     help="Path to the project to be profiled"
 )
 @click.option(
-    "--command",
-    "-c",
+    "--index",
+    "-i",
     type=str,
     required=True,
-    default="start",
-    help="Script name to start your project.\n"
-         "For example: 'start' => 'yarn start'"
+    default="src/index",
+    help="Path to index file in your project\n"
+         "Alternatively you can specify other main file"
 )
 @click.option(
     "--port",
