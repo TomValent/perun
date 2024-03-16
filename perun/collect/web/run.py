@@ -6,11 +6,10 @@ collection and postprocessing of collection data.
 """
 
 import os
-import shlex
 import time
-
 import click
 import psutil
+import shutil
 import requests
 import subprocess
 import perun.logic.runner as runner
@@ -134,9 +133,9 @@ def after(**kwargs):
     """
     perun_log.minor_info("Post-processing phase... ")
 
-    log_dir = kwargs["otp"]
-    metrics = os.path.join(log_dir, "data/metrics/metrics.log")
-    done_folder = os.path.join(log_dir, "data/metrics/done")
+    otp_dir = kwargs["otp"]
+    metrics = os.path.join(otp_dir, "data/metrics/metrics.log")
+    done_folder = os.path.join(otp_dir, "data/metrics/done")
     timestamp = time.strftime("%Y%m%d%H%M%S")
     new_filename = f"{timestamp}_metrics.log"
     os.makedirs(done_folder, exist_ok=True)
@@ -155,7 +154,8 @@ def after(**kwargs):
         exit(1)
 
     # vizualization using call graph
-    run_call_graph()
+    # run_call_graph()          # python option
+    run_call_graph(otp_dir)     # shell option
 
     perun_log.minor_info("Data processing finished.")
 
@@ -180,17 +180,26 @@ def after(**kwargs):
     )
 
 
-def run_call_graph():
-    find_command = "find . -type f -name '*.ts'"
-    find_process = subprocess.Popen(find_command, stdout=subprocess.PIPE, shell=True)
-    ts_files, _ = find_process.communicate()
-    ts_files = ts_files.decode().strip().split("\n")
+# def run_call_graph():
+#     find_command = "find . -type f -name '*.ts'"
+#     find_process = subprocess.Popen(find_command, stdout=subprocess.PIPE, shell=True)
+#     ts_files, _ = find_process.communicate()
+#     ts_files = ts_files.decode().strip().split("\n")
+#
+#     printf_command = "printf 'y\n'"
+#     npx_tcg_command = f"npx tcg {' '.join(shlex.quote(file) for file in ts_files)}"
+#
+#     process_printf = subprocess.Popen(printf_command, stdout=subprocess.PIPE, shell=True)
+#     subprocess.Popen(npx_tcg_command, stdin=process_printf.stdout, shell=True)
 
-    printf_command = "printf 'y\n'"
-    npx_tcg_command = f"npx tcg {' '.join(shlex.quote(file) for file in ts_files)}"
+def run_call_graph(prof_dir: str) -> None:
+    actual_dir = os.getcwd()
+    shutil.copy2(os.path.join(os.path.join(prof_dir, "scripts"), "call-graph.sh"), actual_dir)
 
-    process_printf = subprocess.Popen(printf_command, stdout=subprocess.PIPE, shell=True)
-    subprocess.Popen(npx_tcg_command, stdin=process_printf.stdout, shell=True)
+    script_path = os.path.join(actual_dir, "call-graph.sh")
+    os.chmod(script_path, 0o755)
+    subprocess.run(["./call-graph.sh"], cwd=actual_dir, check=True)
+
 
 def teardown(**kwargs):
     """Perform a cleanup of all the collection resources that need it, i.e. files, locks,
