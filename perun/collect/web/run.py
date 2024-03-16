@@ -6,6 +6,7 @@ collection and postprocessing of collection data.
 """
 
 import os
+import shlex
 import time
 
 import click
@@ -81,7 +82,7 @@ def collect(**kwargs):
             perun_log.minor_info("Collect phase...")
 
             sleep(timeout)
-            kill_processes([project_port, profiler_port])
+            kill_processes([project_port, profiler_port, 3000])
 
             perun_log.minor_info("Collecting finished...")
         else:
@@ -153,6 +154,19 @@ def after(**kwargs):
         perun_log.error(f"File {metrics} was not created or cannot be opened")
         exit(1)
 
+    # vizualization using call graph
+
+    find_command = "find . -type f -name '*.ts'"
+    find_process = subprocess.Popen(find_command, stdout=subprocess.PIPE, shell=True)
+    ts_files, _ = find_process.communicate()
+    ts_files = ts_files.decode().strip().split("\n")
+
+    printf_command = "printf 'y\n'"
+    npx_tcg_command = f"npx tcg {' '.join(shlex.quote(file) for file in ts_files)}"
+
+    process_printf = subprocess.Popen(printf_command, stdout=subprocess.PIPE, shell=True)
+    subprocess.Popen(npx_tcg_command, stdin=process_printf.stdout, shell=True)
+
     perun_log.minor_info("Data processing finished.")
 
     return (
@@ -187,7 +201,7 @@ def teardown(**kwargs):
     """
     perun_log.minor_info("Teardown phase...")
 
-    kill_processes([kwargs["port"], kwargs["prof_port"]])
+    kill_processes([kwargs["port"], kwargs["prof_port"], 3000])
 
     return CollectStatus.OK, "", dict(kwargs)
 
