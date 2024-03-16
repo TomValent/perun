@@ -82,7 +82,7 @@ def collect(**kwargs):
             perun_log.minor_info("Collect phase...")
 
             sleep(timeout)
-            kill_processes([project_port, profiler_port, 3000])
+            kill_processes([project_port, profiler_port])
 
             perun_log.minor_info("Collecting finished...")
         else:
@@ -155,17 +155,7 @@ def after(**kwargs):
         exit(1)
 
     # vizualization using call graph
-
-    find_command = "find . -type f -name '*.ts'"
-    find_process = subprocess.Popen(find_command, stdout=subprocess.PIPE, shell=True)
-    ts_files, _ = find_process.communicate()
-    ts_files = ts_files.decode().strip().split("\n")
-
-    printf_command = "printf 'y\n'"
-    npx_tcg_command = f"npx tcg {' '.join(shlex.quote(file) for file in ts_files)}"
-
-    process_printf = subprocess.Popen(printf_command, stdout=subprocess.PIPE, shell=True)
-    subprocess.Popen(npx_tcg_command, stdin=process_printf.stdout, shell=True)
+    run_call_graph()
 
     perun_log.minor_info("Data processing finished.")
 
@@ -190,6 +180,18 @@ def after(**kwargs):
     )
 
 
+def run_call_graph():
+    find_command = "find . -type f -name '*.ts'"
+    find_process = subprocess.Popen(find_command, stdout=subprocess.PIPE, shell=True)
+    ts_files, _ = find_process.communicate()
+    ts_files = ts_files.decode().strip().split("\n")
+
+    printf_command = "printf 'y\n'"
+    npx_tcg_command = f"npx tcg {' '.join(shlex.quote(file) for file in ts_files)}"
+
+    process_printf = subprocess.Popen(printf_command, stdout=subprocess.PIPE, shell=True)
+    subprocess.Popen(npx_tcg_command, stdin=process_printf.stdout, shell=True)
+
 def teardown(**kwargs):
     """Perform a cleanup of all the collection resources that need it, i.e. files, locks,
     processes, kernel modules etc.
@@ -201,7 +203,9 @@ def teardown(**kwargs):
     """
     perun_log.minor_info("Teardown phase...")
 
-    kill_processes([kwargs["port"], kwargs["prof_port"], 3000])
+    cg_port = 3000
+
+    kill_processes([kwargs["port"], kwargs["prof_port"], cg_port])
 
     return CollectStatus.OK, "", dict(kwargs)
 
