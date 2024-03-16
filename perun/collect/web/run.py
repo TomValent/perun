@@ -133,14 +133,21 @@ def after(**kwargs):
 
     log_dir = kwargs["otp"]
     metrics = os.path.join(log_dir, "data/metrics/metrics.log")
+    done_folder = os.path.join(log_dir, "data/metrics/done")
+    os.makedirs(done_folder, exist_ok=True)
 
     metrics_data = []
     parser = Parser()
 
-    with open(metrics, 'r') as metrics_file:
-        for line in metrics_file:
-            parsed_line = parser.parse_metric(line)
-            metrics_data.append(parsed_line)
+    try:
+        with open(metrics, 'r') as metrics_file:
+            for line in metrics_file:
+                parsed_line = parser.parse_metric(line)
+                metrics_data.append(parsed_line)
+            os.rename(metrics, os.path.join(done_folder, "metrics.log"))
+    except FileNotFoundError as e:
+        perun_log.error(f"File {metrics} was not created or cannot be opened")
+        exit(1)
 
     perun_log.minor_info("Data processing finished.")
 
