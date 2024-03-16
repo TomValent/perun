@@ -198,7 +198,11 @@ def run_call_graph(prof_dir: str) -> None:
 
     script_path = os.path.join(actual_dir, "call-graph.sh")
     os.chmod(script_path, 0o755)
-    subprocess.run(["./call-graph.sh"], cwd=actual_dir, check=True)
+
+    try:
+        subprocess.Popen(["./call-graph.sh"], cwd=actual_dir)
+    except subprocess.CalledProcessError:
+        kill_processes([3000])
 
 
 def teardown(**kwargs):
