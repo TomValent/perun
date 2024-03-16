@@ -6,6 +6,8 @@ collection and postprocessing of collection data.
 """
 
 import os
+import time
+
 import click
 import psutil
 import requests
@@ -134,6 +136,8 @@ def after(**kwargs):
     log_dir = kwargs["otp"]
     metrics = os.path.join(log_dir, "data/metrics/metrics.log")
     done_folder = os.path.join(log_dir, "data/metrics/done")
+    timestamp = time.strftime("%Y%m%d%H%M%S")
+    new_filename = f"{timestamp}_metrics.log"
     os.makedirs(done_folder, exist_ok=True)
 
     metrics_data = []
@@ -144,7 +148,7 @@ def after(**kwargs):
             for line in metrics_file:
                 parsed_line = parser.parse_metric(line)
                 metrics_data.append(parsed_line)
-            os.rename(metrics, os.path.join(done_folder, "metrics.log"))
+            os.rename(metrics, os.path.join(done_folder, new_filename))
     except FileNotFoundError as e:
         perun_log.error(f"File {metrics} was not created or cannot be opened")
         exit(1)
