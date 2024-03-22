@@ -9,7 +9,6 @@ import os
 import time
 import click
 import psutil
-import shutil
 import requests
 import subprocess
 import perun.logic.runner as runner
@@ -153,10 +152,6 @@ def after(**kwargs):
         perun_log.error(f"File {metrics} was not created or cannot be opened")
         exit(1)
 
-    # vizualization using call graph
-    # run_call_graph()          # python option
-    run_call_graph(otp_dir)     # shell option
-
     perun_log.minor_info("Data processing finished.")
 
     return (
@@ -180,31 +175,6 @@ def after(**kwargs):
     )
 
 
-# def run_call_graph():
-#     find_command = "find . -type f -name '*.ts'"
-#     find_process = subprocess.Popen(find_command, stdout=subprocess.PIPE, shell=True)
-#     ts_files, _ = find_process.communicate()
-#     ts_files = ts_files.decode().strip().split("\n")
-#
-#     printf_command = "printf 'y\n'"
-#     npx_tcg_command = f"npx tcg {' '.join(shlex.quote(file) for file in ts_files)}"
-#
-#     process_printf = subprocess.Popen(printf_command, stdout=subprocess.PIPE, shell=True)
-#     subprocess.Popen(npx_tcg_command, stdin=process_printf.stdout, shell=True)
-
-def run_call_graph(prof_dir: str) -> None:
-    actual_dir = os.getcwd()
-    shutil.copy2(os.path.join(os.path.join(prof_dir, "scripts"), "call-graph.sh"), actual_dir)
-
-    script_path = os.path.join(actual_dir, "call-graph.sh")
-    os.chmod(script_path, 0o755)
-
-    try:
-        subprocess.Popen(["./call-graph.sh"], cwd=actual_dir)
-    except subprocess.CalledProcessError:
-        kill_processes([3000])
-
-
 def teardown(**kwargs):
     """Perform a cleanup of all the collection resources that need it, i.e. files, locks,
     processes, kernel modules etc.
@@ -216,9 +186,7 @@ def teardown(**kwargs):
     """
     perun_log.minor_info("Teardown phase...")
 
-    cg_port = 3000
-
-    kill_processes([kwargs["port"], kwargs["prof_port"], cg_port])
+    kill_processes([kwargs["port"], kwargs["prof_port"]])
 
     return CollectStatus.OK, "", dict(kwargs)
 

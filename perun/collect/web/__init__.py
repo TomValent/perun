@@ -9,6 +9,7 @@ COLLECTOR_DEFAULT_UNITS = {
     "error_count":             "",
     "error_code_count":        "",
     "error_message_count":     "",
-    "memory_usage_counter":    "bits",
+    "memory_usage_counter":    "bytes",
     "request_latency_summary": "ms",
+    "throughput":              "requests per second",
 }
