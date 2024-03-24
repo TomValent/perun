@@ -166,8 +166,9 @@ def after(**kwargs):
                             "amount": value,
                             "uid": route,
                             "type": key,
+                            "timestamp": timestamp,
                         }
-                        for (key, value, route) in metrics_data
+                        for (key, value, route, timestamp) in metrics_data
                     ]
                 }
             }
