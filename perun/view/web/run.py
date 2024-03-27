@@ -5,14 +5,62 @@ import click
 import shlex
 import subprocess
 import pandas as pd
-import perun.profile.factory as profile_factory
+import seaborn as sns
+from holoviews.ipython import display
 
+import perun.profile.factory as profile_factory
+import holoviews as hv
+
+from holoviews import opts
 from typing import Any, List
 from matplotlib import pyplot as plt
+from holoviews.operation import gridmatrix
 from perun.view.web.unsupported_metric_exception import UnsupportedMetricException
 
 
+output_dir = "view"
+
+
+def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, show: bool):
+    """Generate a pairplot Matrix (SPLOM) for exploring relationships between multiple metrics in the given dataset.
+       https://seaborn.pydata.org/generated/seaborn.pairplot.html
+
+    Parameters:
+        data (List[dict[str, Any]]): The dataset as a list of dictionaries.
+        metric1 (str): The first metric to be compared.
+        metric2 (str): The second metric to be compared.
+        show (bool): Flag indicating whether to display the pairplot or not.
+
+    Returns:
+        None
+    """
+
+    df = pd.DataFrame(data)
+
+    sns.set(style="ticks", color_codes=True)
+
+    filtered_memory_df = df[df["type"] == metric1].copy()
+    filtered_latency_df = df[df["type"] == metric2].copy()
+
+    filtered_memory_df.reset_index(drop=True, inplace=True)
+    filtered_latency_df.reset_index(drop=True, inplace=True)
+
+    combined_df = pd.DataFrame({
+        "memory_amount [bytes]": filtered_memory_df["amount"],
+        "latency_amount [ms]": filtered_latency_df["amount"]
+    })
+
+    sns.pairplot(combined_df)
+
+    if show:
+        plt.show()
+
+    plt.savefig(f"{output_dir}/pairplot_memory_latency.png")
+
+
 def get_graph_labels(route, metric):
+    """Function for graph labels for supported metrics.
+    """
     match metric:
         case "page_requests":
             plt.xlabel("Time")
@@ -34,9 +82,7 @@ def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, 
     df.rename(columns={"amount": "value"}, inplace=True)
     df = df[df["type"] == metric]
     df = df[df["uid"] != "/favicon.ico"]
-    print(df)
 
-    output_dir = os.path.join(os.getcwd(), 'view')
     os.makedirs(output_dir, exist_ok=True)
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
@@ -117,5 +163,8 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     generate_line_graph(sliced_data, group_by, "page_requests", show)
     generate_line_graph(sliced_data, group_by, "error_count", show)
 
-    if show:
+    generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
+    # generate_heatmap(sliced_data, "memory_usage_counter", "request_latency_summary", show)
+
+    if show and False:
         run_call_graph()
