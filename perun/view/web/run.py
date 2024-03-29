@@ -20,10 +20,6 @@ from perun.view.web.unsupported_metric_exception import UnsupportedMetricExcepti
 output_dir = "view/"
 
 
-def generate_psutil(data: List[dict[str, Any]], metric: str, show: bool,) -> None:
-    """https://holoviews.org/gallery/apps/bokeh/streaming_psutil.html"""
-
-
 def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "20s") -> None:
     """Heatmap for supported metrics of web collector
     You need to define labels for new metric in `get_graph_labels`, if it is not done already.
@@ -47,16 +43,16 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
     df["amount"] = pd.to_numeric(df["amount"])
-    df['count'] = 1
+    df["count"] = 1
 
     df_filtered = df[df["type"] == metric]
-    df_agg = df_filtered.groupby(['time', 'amount']).count().reset_index()
+    df_agg = df_filtered.groupby(["time", "amount"]).count().reset_index()
 
-    max_count = df_agg['count'].max()
-    df_agg['normalized_count'] = df_agg['count'] / max_count
+    max_count = df_agg["count"].max()
+    df_agg["normalized_count"] = df_agg["count"] / max_count
 
-    ds = hv.Dataset(data=df_agg, kdims=['time', 'amount'], vdims=['normalized_count'])
-    heatmap = ds.to(hv.HeatMap, ['time', 'amount'], 'normalized_count')
+    ds = hv.Dataset(data=df_agg, kdims=["time", "amount"], vdims=["normalized_count"])
+    heatmap = ds.to(hv.HeatMap, ["time", "amount"], "normalized_count")
 
     labels = get_graph_labels("", metric)
     heatmap.opts(opts.HeatMap(
@@ -65,7 +61,7 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
         colorbar=True,
         width=800,
         toolbar="above",
-        cmap='Blues')
+        cmap="Blues")
     )
 
     filename = output_dir + metric + "_heatmap.html"
@@ -133,9 +129,9 @@ def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
             plt.ylabel(f"Number of errors")
             plt.title(f"Number of errors for route {route}")
         case "memory_usage_counter":
-            return {'xlabel': 'Time [hh:mm:ss]', 'ylabel': 'Memory used [B]', 'title': 'Memory heatmap'}
+            return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Memory used [B]", "title": "Memory heatmap"}
         case "request_latency_summary":
-            return {'xlabel': 'Time [hh:mm:ss]', 'ylabel': 'Page Latency [ms]', 'title': 'Latency heatmap'}
+            return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Page Latency [ms]", "title": "Latency heatmap"}
         case _:
             raise UnsupportedMetricException("Labels for this metric are not specified")
 
@@ -254,7 +250,5 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     generate_heatmap(sliced_data, "memory_usage_counter", show)
     generate_heatmap(sliced_data, "request_latency_summary", show)
 
-    # generate_psutil(sliced_data, "memory_usage_counter", show)
-
-    if show and False:
+    if show:
         run_call_graph()
