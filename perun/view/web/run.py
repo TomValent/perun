@@ -115,6 +115,13 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
 
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
     """Function for graph labels for supported metrics.
+
+    Args:
+        route (str): The route for which labels are needed.
+        metric (str): The metric for which labels are needed.
+
+    Returns:
+        Union[Dict[str, str], None]: A dictionary containing graph labels if supported, otherwise None.
     """
     match metric:
         case "page_requests":
@@ -136,6 +143,15 @@ def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
 def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, show: bool) -> None:
     """Generate line graph for metrics without unit. Plot graph for number of occurrences.
     You need to define labels for new metric in `get_graph_labels`, if it is not done already.
+
+    Args:
+        data (List[Dict[str, Any]]): The data to be plotted.
+        group_by (str): The time interval for grouping the data.
+        metric (str): The metric to be visualized.
+        show (bool): Whether to display the line graph.
+
+    Returns:
+        None
     """
     df = pd.DataFrame(data)
     df.drop(columns=["time"], inplace=True)
@@ -179,6 +195,9 @@ def run_call_graph() -> None:
     Function finds all TS files in project and statically find project functions
     to create call graph.
     Credits to author of the package https://github.com/whyboris/TypeScript-Call-Graph
+
+    Returns:
+        None
     """
 
     find_command = "find . -type f -name '*.ts'"
@@ -219,6 +238,9 @@ def run_call_graph() -> None:
 def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     """Graphs visualizing metrics collected by web collector.
        Graphs are saved to /view directory in your project
+
+       Returns:
+           None
     """
 
     data = profile.all_resources()
