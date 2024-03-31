@@ -98,7 +98,7 @@ def kill_processes(ports: List[int]) -> None:
 
     for port in ports:
         for conn in psutil.net_connections():
-            if conn.laddr.port == port and conn.status == 'LISTEN':
+            if conn.laddr.port == port and conn.status == 'LISTEN' and port != 0:
                 subprocess.run(["kill", "-9", str(conn.pid)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -187,7 +187,7 @@ def teardown(**kwargs):
     """
     perun_log.minor_info("Teardown phase...")
 
-    kill_processes([kwargs["port"], kwargs["prof_port"]])
+    kill_processes([kwargs.get("port", 0), kwargs.get("prof_port", 0)])
 
     return CollectStatus.OK, "", dict(kwargs)
 
