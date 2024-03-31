@@ -1,14 +1,14 @@
 """Graphical visualization of the profiles made by `web` collector"""
 
 import os
-import webbrowser
-
 import click
 import shlex
 import subprocess
+import webbrowser
 import pandas as pd
 import seaborn as sns
 import holoviews as hv
+from perun.utils import log as perun_log
 import perun.profile.factory as profile_factory
 
 from holoviews import opts
@@ -251,4 +251,5 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     generate_heatmap(sliced_data, "request_latency_summary", show)
 
     if show:
+        perun_log.minor_info("This call graph works for typescript files only.")
         run_call_graph()
