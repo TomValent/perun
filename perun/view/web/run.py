@@ -107,12 +107,12 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
     })
 
     sns.set(rc={'figure.figsize': (10, 10)})
-    sns.pairplot(combined_df)
+    pairplot = sns.pairplot(combined_df)
 
     if show:
         plt.show()
 
-    plt.savefig(f"{output_dir}pairplot_memory_latency.png")
+    pairplot.savefig(f"{output_dir}pairplot_memory_latency.png")
 
 
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
