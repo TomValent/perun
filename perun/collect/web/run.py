@@ -14,7 +14,7 @@ import subprocess
 import perun.logic.runner as runner
 
 from time import sleep
-from typing import Any, List
+from typing import Any, List, Tuple, Dict
 from datetime import datetime
 from perun.utils import log as perun_log
 from perun.utils.external import processes
@@ -23,7 +23,7 @@ from perun.utils.structs import CollectStatus, Executable
 from perun.collect.web.build_exception import BuildException
 
 
-def before(executable: Executable, **kwargs):
+def before(executable: Executable, **kwargs: Any) -> Tuple[CollectStatus, str, Dict[str, Any]]:
     """Validates, initializes and normalizes the collection configuration.
 
     :param Executable executable: full collection command with arguments and workload
@@ -52,7 +52,7 @@ def before(executable: Executable, **kwargs):
     return CollectStatus.OK, "", dict(kwargs)
 
 
-def collect(**kwargs):
+def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     """Assembles the engine collect program according to input parameters and collection strategy.
     Runs the created collection program and the profiled command.
 
@@ -122,7 +122,7 @@ def wait_until_server_starts(url: str, max_attempts: int = 20, wait_time: float 
     return False
 
 
-def after(**kwargs):
+def after(**kwargs) -> tuple[CollectStatus, str, dict[str, dict[str, dict[str, list[dict[str, Any]] | float]]]]:
     """Parses the trace collector output and transforms it into profile resources
 
     :param kwargs: the configuration settings for the collector
@@ -176,7 +176,7 @@ def after(**kwargs):
     )
 
 
-def teardown(**kwargs):
+def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     """Perform a cleanup of all the collection resources that need it, i.e. files, locks,
     processes, kernel modules etc.
 

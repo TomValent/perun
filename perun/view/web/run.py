@@ -8,19 +8,20 @@ import webbrowser
 import pandas as pd
 import seaborn as sns
 import holoviews as hv
-from perun.utils import log as perun_log
 import perun.profile.factory as profile_factory
 
 from holoviews import opts
 from typing import Any, List, Union
 from matplotlib import pyplot as plt
+from perun.utils import log as perun_log
+from matplotlib.colors import LinearSegmentedColormap
 from perun.view.web.unsupported_metric_exception import UnsupportedMetricException
 
 
 output_dir = "view/"
 
 
-def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "20s") -> None:
+def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "2min") -> None:
     """Heatmap for supported metrics of web collector
     You need to define labels for new metric in `get_graph_labels`, if it is not done already.
     https://holoviews.org/reference/elements/plotly/HeatMap.html
@@ -54,14 +55,18 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     ds = hv.Dataset(data=df_agg, kdims=["time", "amount"], vdims=["normalized_count"])
     heatmap = ds.to(hv.HeatMap, ["time", "amount"], "normalized_count")
 
+    cmap = ["black", "red", "orange", "yellow"]
+    cmap = LinearSegmentedColormap.from_list("cmap", cmap)
     labels = get_graph_labels("", metric)
-    heatmap.opts(opts.HeatMap(
-        **labels,
-        tools=["hover"],
-        colorbar=True,
-        width=800,
-        toolbar="above",
-        cmap="Blues")
+    heatmap.opts(
+        opts.HeatMap(
+            **labels,
+            tools=["hover"],
+            colorbar=True,
+            width=800,
+            toolbar="above",
+            cmap=cmap,
+        )
     )
 
     filename = output_dir + metric + "_heatmap.html"
@@ -101,6 +106,7 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
         "latency_amount [ms]": filtered_latency_df["amount"]
     })
 
+    sns.set(rc={'figure.figsize': (10, 10)})
     sns.pairplot(combined_df)
 
     if show:
@@ -149,6 +155,7 @@ def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, 
     Returns:
         None
     """
+
     df = pd.DataFrame(data)
     df.drop(columns=["time"], inplace=True)
     df.rename(columns={"amount": "value"}, inplace=True)
@@ -239,8 +246,12 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
            None
     """
 
+    perun_log.minor_info("Parsing profile for graphs...")
+
     data = profile.all_resources()
     sliced_data = [item[1] for item in data]
+
+    perun_log.minor_info("Generating graphs...")
 
     generate_line_graph(sliced_data, group_by, "page_requests", show)
     generate_line_graph(sliced_data, group_by, "error_count", show)
@@ -251,5 +262,8 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     generate_heatmap(sliced_data, "request_latency_summary", show)
 
     if show:
-        perun_log.minor_info("This call graph works for typescript files only.")
+        perun_log.minor_info("Generating call graph...")
+        perun_log.minor_info("This call graph works for typescript files only...")
         run_call_graph()
+
+    perun_log.minor_info("Generating graphs finished...")

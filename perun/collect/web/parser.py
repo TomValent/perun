@@ -6,7 +6,7 @@ import string
 class Parser:
     """ Parser for OpenTelemetry logs"""
 
-    def parse_metric(self, line: string) -> tuple[string, float, string, datetime]:
+    def parse_metric(self, line: str) -> tuple[str, float, str, datetime.date]:
         """Parse metric from log for profile"""
 
         data = json.loads(line)
@@ -17,15 +17,14 @@ class Parser:
         timestamp = datetime.datetime.fromtimestamp(timestamp_seconds) + datetime.timedelta(
             microseconds=timestamp_microseconds)
 
-        if not isinstance(current, int):
+        if not isinstance(current, float):
             value = current.get("sum")
         else:
             value = current
 
         return data["descriptor"]["name"], value, data["labels"].get("route", ""), timestamp.isoformat()
 
-
-    def parse_trace(self, line: string):
+    def parse_trace(self, line: str) -> None:
         """Parse trace from log for profile"""
 
         data_dict = json.loads(line)
