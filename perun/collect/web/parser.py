@@ -17,7 +17,7 @@ class Parser:
         timestamp = datetime.datetime.fromtimestamp(timestamp_seconds) + datetime.timedelta(
             microseconds=timestamp_microseconds)
 
-        if not isinstance(current, float):
+        if not isinstance(current, int) and not isinstance(current, float):
             value = current.get("sum")
         else:
             value = current

@@ -210,13 +210,13 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     help="Path to the project to be profiled"
 )
 @click.option(
-    "--index",
-    "-i",
+    "--express",
+    "-e",
     type=str,
     required=True,
-    default="src/index",
-    help="Path to index file in your project\n"
-         "Alternatively you can specify other main file"
+    help="Path to file in your project\n"
+         "containing express() app with export\n"
+         "export must be default or named 'app'"
 )
 @click.option(
     "--port",

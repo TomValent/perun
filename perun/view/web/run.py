@@ -102,7 +102,7 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
     filtered_latency_df.reset_index(drop=True, inplace=True)
 
     combined_df = pd.DataFrame({
-        "memory_amount [B]": filtered_memory_df["amount"],
+        "memory_amount [MB]": filtered_memory_df["amount"],
         "latency_amount [ms]": filtered_latency_df["amount"]
     })
 
@@ -135,7 +135,7 @@ def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
             plt.ylabel(f"Number of errors")
             plt.title(f"Number of errors for route {route}")
         case "memory_usage_counter":
-            return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Memory used [B]", "title": "Memory heatmap"}
+            return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Memory used [MB]", "title": "Memory heatmap"}
         case "request_latency_summary":
             return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Page Latency [ms]", "title": "Latency heatmap"}
         case _:
@@ -181,7 +181,7 @@ def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, 
         plt.tight_layout()
 
         if not route == "/":
-            filename = f"{output_dir}{metric}_{route.lstrip('/')}.png"
+            filename = f"{output_dir}{metric}_{route.lstrip('/').replace('/', '_')}.png"
         else:
             filename = f"{output_dir}{metric}_root.png"
 
