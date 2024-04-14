@@ -351,20 +351,20 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating pairplots...")
 
-    # generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
-    # generate_pairplot(sliced_data, "fs_read", "fs_write", show)
-    # generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
-    # generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
-    # generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
+    generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
+    generate_pairplot(sliced_data, "fs_read", "fs_write", show)
+    generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
+    generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
+    generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
 
     perun_log.minor_info("Generating heatmaps...")
 
     generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
-    # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
-    #
-    # if show:
-    #     perun_log.minor_info("Generating call graph...")
-    #     perun_log.minor_info("This call graph works for typescript files only...")
-    #     run_call_graph()
+    generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
+
+    if show:
+        perun_log.minor_info("Generating call graph...")
+        perun_log.minor_info("This call graph works for typescript files only...")
+        run_call_graph()
 
     perun_log.minor_info("Generating graphs finished...")
