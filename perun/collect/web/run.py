@@ -63,7 +63,7 @@ def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     """
 
     project_path = kwargs["proj"]
-    index_file = kwargs["index"]
+    express_file = kwargs["express"]
     timeout = kwargs["timeout"]
     project_port = kwargs["port"]
     profiler_port = kwargs["prof_port"]
@@ -71,7 +71,7 @@ def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     command = "start"
 
     with processes.nonblocking_subprocess(
-            "yarn " + command + " --silent " + "--path " + project_path + index_file,
+            "yarn " + command + " --silent " + "--path " + project_path + express_file,
             {"cwd": profiler_path}
     ) as prof_process:
         perun_log.minor_info("Warm up phase...")

@@ -13,9 +13,7 @@ class Parser:
         current = data['aggregator']['_current']
 
         timestamp_seconds = data['aggregator']['_lastUpdateTime'][0]
-        timestamp_microseconds = data['aggregator']['_lastUpdateTime'][1]
-        timestamp = datetime.datetime.fromtimestamp(timestamp_seconds) + datetime.timedelta(
-            microseconds=timestamp_microseconds)
+        timestamp = datetime.datetime.fromtimestamp(timestamp_seconds)
 
         if not isinstance(current, int) and not isinstance(current, float):
             value = current.get("sum")

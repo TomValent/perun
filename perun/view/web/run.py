@@ -255,11 +255,12 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     generate_line_graph(sliced_data, group_by, "page_requests", show)
     generate_line_graph(sliced_data, group_by, "error_count", show)
+    generate_line_graph(sliced_data, group_by, "error_count", show)
 
     generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
 
-    generate_heatmap(sliced_data, "memory_usage_counter", show)
-    generate_heatmap(sliced_data, "request_latency_summary", show)
+    generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+    generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
 
     if show:
         perun_log.minor_info("Generating call graph...")
