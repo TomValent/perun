@@ -11,7 +11,7 @@ import holoviews as hv
 import perun.profile.factory as profile_factory
 
 from holoviews import opts
-from typing import Any, List, Union
+from typing import Any, List, Union, Dict
 from matplotlib import pyplot as plt
 from perun.utils import log as perun_log
 from matplotlib.colors import LinearSegmentedColormap
@@ -77,6 +77,40 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
         webbrowser.open(filename)
 
 
+def get_pairplot_labels(metric: str, data: Any) -> Dict[str, Any]:
+    """Generate pairplot labels for the given metric and data.
+
+    Parameters:
+        metric (str): The metric for which labels are to be generated.
+        data (Any): The data associated with the metric.
+
+    Returns:
+        Dict[str, Any]: A dictionary containing pairplot labels for the given metric and data.
+    """
+
+    match metric:
+        case "memory_usage_counter":
+            return {"Memory_amount (MB)": data}
+        case "request_latency_summary":
+            return {"Latency amount (ms)": data}
+        case "user_cpu_usage":
+            return {"User CPU Usage (s)": data}
+        case "system_cpu_usage":
+            return {"System CPU Usage (s)": data}
+        case "user_cpu_time":
+            return {"User CPU Time (s)": data}
+        case "system_cpu_time":
+            return {"System CPU Time (s)": data}
+        case "fs_read":
+            return {"FS Read": data}
+        case "fs_write":
+            return {"FS Write": data}
+        case "voluntary_context_switches":
+            return {"Voluntary Context Switches": data}
+        case _:
+            raise UnsupportedMetricException("Labels for this metric are not specified")
+
+
 def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, show: bool) -> None:
     """Generate a pairplot Matrix (SPLOM) for exploring relationships between multiple metrics in the given dataset.
        https://seaborn.pydata.org/generated/seaborn.pairplot.html
@@ -95,15 +129,15 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
 
     sns.set(style="ticks", color_codes=True)
 
-    filtered_memory_df = df[df["type"] == metric1].copy()
-    filtered_latency_df = df[df["type"] == metric2].copy()
+    filtered_df_metric1 = df[df["type"] == metric1].copy()
+    filtered_df_metric2 = df[df["type"] == metric2].copy()
 
-    filtered_memory_df.reset_index(drop=True, inplace=True)
-    filtered_latency_df.reset_index(drop=True, inplace=True)
+    filtered_df_metric1.reset_index(drop=True, inplace=True)
+    filtered_df_metric2.reset_index(drop=True, inplace=True)
 
     combined_df = pd.DataFrame({
-        "memory_amount [MB]": filtered_memory_df["amount"],
-        "latency_amount [ms]": filtered_latency_df["amount"]
+        get_pairplot_labels(metric1, filtered_df_metric1["amount"]),
+        get_pairplot_labels(metric2, filtered_df_metric2["amount"]),
     })
 
     sns.set(rc={'figure.figsize': (10, 10)})
@@ -112,7 +146,7 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
     if show:
         plt.show()
 
-    pairplot.savefig(f"{output_dir}pairplot_memory_latency.png")
+    pairplot.savefig(f"{output_dir}pairplot_{metric1}_{metric2}.png")
 
 
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
@@ -189,9 +223,11 @@ def generate_line_graph(
     if for_all_routes:
         plt.figure(figsize=(10, 6))
 
-        grouped_df["timestamp"] = grouped_df["timestamp"].dt.strftime("%H:%M:%S")
-        plt.plot(grouped_df["timestamp"], grouped_df["requests"])
-        plt.fill_between(grouped_df["timestamp"], grouped_df["requests"], color="skyblue", alpha=0.4)
+        summed_requests = grouped_df.groupby("timestamp")["requests"].sum().reset_index()
+
+        summed_requests["timestamp"] = summed_requests["timestamp"].dt.strftime("%H:%M:%S")
+        plt.plot(summed_requests["timestamp"], summed_requests["requests"])
+        plt.fill_between(summed_requests["timestamp"], summed_requests["requests"], color="skyblue", alpha=0.4)
 
         get_graph_labels("", metric)
 
@@ -294,14 +330,15 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     perun_log.minor_info("Generating graphs...")
 
     # generate_line_graph(sliced_data, group_by, "page_requests", show)
-    # generate_line_graph(sliced_data, group_by, "error_count", show)
-    generate_line_graph(sliced_data, group_by, "fs_read", show, True)
-    generate_line_graph(sliced_data, group_by, "fs_write", show, True)
-    generate_line_graph(sliced_data, group_by, "voluntary_context_switches", show, True)
+    # generate_line_graph(sliced_data, group_by, "fs_read", show, True)
+    # generate_line_graph(sliced_data, group_by, "fs_write", show, True)
+    # generate_line_graph(sliced_data, group_by, "voluntary_context_switches", show, True)
 
     # generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
-    # generate_pairplot(sliced_data, "fs_read", "fs_write", show)
-    # generate_pairplot(sliced_data, "user_cpu_usage", "system_cpu_usage", show)
+    generate_pairplot(sliced_data, "fs_read", "fs_write", show)
+    generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
+    generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
+    generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
 
     # generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
     # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
