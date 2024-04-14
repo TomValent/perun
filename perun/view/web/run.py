@@ -5,6 +5,8 @@ import click
 import shlex
 import subprocess
 import webbrowser
+
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import holoviews as hv
@@ -21,7 +23,7 @@ from perun.view.web.unsupported_metric_exception import UnsupportedMetricExcepti
 output_dir = "view/"
 
 
-def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "2min") -> None:
+def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "10s") -> None:
     """Heatmap for supported metrics of web collector
     You need to define labels for new metric in `get_graph_labels`, if it is not done already.
     https://holoviews.org/reference/elements/plotly/HeatMap.html
@@ -40,6 +42,7 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
 
     df = pd.DataFrame(data)
 
+    # parse data
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
@@ -52,7 +55,17 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     max_count = df_agg["count"].max()
     df_agg["normalized_count"] = df_agg["count"] / max_count
 
-    ds = hv.Dataset(data=df_agg, kdims=["time", "amount"], vdims=["normalized_count"])
+    # fill missing data
+    time_range = df_agg["time"].unique()
+    amount_range = df_agg["amount"].unique()
+    index = pd.MultiIndex.from_product([time_range, amount_range], names=["time", "amount"])
+    df_all_combinations = pd.DataFrame(index=index).reset_index()
+
+    df_merged = df_all_combinations.merge(df_agg, on=["time", "amount"], how="left")
+    df_merged["normalized_count"] = df_merged["normalized_count"].fillna(0)
+
+    # plot heatmap
+    ds = hv.Dataset(data=df_merged, kdims=["time", "amount"], vdims=["normalized_count"])
     heatmap = ds.to(hv.HeatMap, ["time", "amount"], "normalized_count")
 
     cmap = ["black", "red", "orange", "yellow"]
@@ -87,7 +100,6 @@ def get_pairplot_labels(metric: str, data: Any) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: A dictionary containing pairplot labels for the given metric and data.
     """
-
     match metric:
         case "memory_usage_counter":
             return {"Memory_amount (MB)": data}
@@ -108,7 +120,7 @@ def get_pairplot_labels(metric: str, data: Any) -> Dict[str, Any]:
         case "voluntary_context_switches":
             return {"Voluntary Context Switches": data}
         case _:
-            raise UnsupportedMetricException("Labels for this metric are not specified")
+            raise UnsupportedMetricException(f"Labels for metric {metric} are not specified")
 
 
 def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, show: bool) -> None:
@@ -135,9 +147,12 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
     filtered_df_metric1.reset_index(drop=True, inplace=True)
     filtered_df_metric2.reset_index(drop=True, inplace=True)
 
+    labels_metric1 = get_pairplot_labels(metric1, filtered_df_metric1["amount"])
+    labels_metric2 = get_pairplot_labels(metric2, filtered_df_metric2["amount"])
+
     combined_df = pd.DataFrame({
-        get_pairplot_labels(metric1, filtered_df_metric1["amount"]),
-        get_pairplot_labels(metric2, filtered_df_metric2["amount"]),
+        **labels_metric1,
+        **labels_metric2,
     })
 
     sns.set(rc={'figure.figsize': (10, 10)})
@@ -185,14 +200,14 @@ def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
             plt.ylabel("Voluntary context switches")
             plt.title(f"Number of voluntary context switches over time for all routes")
         case _:
-            raise UnsupportedMetricException("Labels for this metric are not specified")
+            raise UnsupportedMetricException(f"Labels for metric {metric} are not specified")
 
 
 def generate_line_graph(
         data: List[dict[str, Any]],
-        group_by: str,
         metric: str,
         show: bool,
+        group_by: str = "10s",
         for_all_routes: bool = False
 ) -> None:
     """Generate line graph for metrics without unit. Plot graph for number of occurrences.
@@ -327,20 +342,24 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     data = profile.all_resources()
     sliced_data = [item[1] for item in data]
 
-    perun_log.minor_info("Generating graphs...")
+    perun_log.minor_info("Generating line graphs...")
 
-    # generate_line_graph(sliced_data, group_by, "page_requests", show)
-    # generate_line_graph(sliced_data, group_by, "fs_read", show, True)
-    # generate_line_graph(sliced_data, group_by, "fs_write", show, True)
-    # generate_line_graph(sliced_data, group_by, "voluntary_context_switches", show, True)
+    # generate_line_graph(sliced_data, "page_requests", show, group_by)
+    # generate_line_graph(sliced_data, "fs_read", show, group_by, True)
+    # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
+    # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
+
+    perun_log.minor_info("Generating pairplots...")
 
     # generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
-    generate_pairplot(sliced_data, "fs_read", "fs_write", show)
-    generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
-    generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
-    generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
+    # generate_pairplot(sliced_data, "fs_read", "fs_write", show)
+    # generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
+    # generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
+    # generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
 
-    # generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+    perun_log.minor_info("Generating heatmaps...")
+
+    generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
     # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
     #
     # if show:
