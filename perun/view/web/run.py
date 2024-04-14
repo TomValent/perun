@@ -128,21 +128,39 @@ def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
     match metric:
         case "page_requests":
             plt.xlabel("Time")
-            plt.ylabel(f"Number of requests")
+            plt.ylabel("Number of requests")
             plt.title(f"Number of requests over time - Route {route}")
         case "error_count":
             plt.xlabel("Time")
-            plt.ylabel(f"Number of errors")
+            plt.ylabel("Number of errors")
             plt.title(f"Number of errors for route {route}")
         case "memory_usage_counter":
             return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Memory used [MB]", "title": "Memory heatmap"}
         case "request_latency_summary":
             return {"xlabel": "Time [hh:mm:ss]", "ylabel": "Page Latency [ms]", "title": "Latency heatmap"}
+        case "fs_read":
+            plt.xlabel("Time")
+            plt.ylabel("File system reads")
+            plt.title(f"Number of fs reads over time for all routes")
+        case "fs_write":
+            plt.xlabel("Time")
+            plt.ylabel("File system writes")
+            plt.title(f"Number of fs writes over time for all routes")
+        case "voluntary_context_switches":
+            plt.xlabel("Time")
+            plt.ylabel("Voluntary context switches")
+            plt.title(f"Number of voluntary context switches over time for all routes")
         case _:
             raise UnsupportedMetricException("Labels for this metric are not specified")
 
 
-def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, show: bool) -> None:
+def generate_line_graph(
+        data: List[dict[str, Any]],
+        group_by: str,
+        metric: str,
+        show: bool,
+        for_all_routes: bool = False
+) -> None:
     """Generate line graph for metrics without unit. Plot graph for number of occurrences.
     You need to define labels for new metric in `get_graph_labels`, if it is not done already.
 
@@ -168,22 +186,19 @@ def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, 
     df["time_grouped"] = df["timestamp"].dt.floor(group_by)
     grouped_df = df.set_index("timestamp").groupby("uid").resample(group_by).size().reset_index(name="requests")
 
-    for route, route_data in grouped_df.groupby("uid"):
+    if for_all_routes:
         plt.figure(figsize=(10, 6))
 
-        route_data["timestamp"] = route_data["timestamp"].dt.strftime("%H:%M:%S")
-        plt.plot(route_data["timestamp"], route_data["requests"], label=route)
-        plt.fill_between(route_data["timestamp"], route_data["requests"], color="skyblue", alpha=0.4)
+        grouped_df["timestamp"] = grouped_df["timestamp"].dt.strftime("%H:%M:%S")
+        plt.plot(grouped_df["timestamp"], grouped_df["requests"])
+        plt.fill_between(grouped_df["timestamp"], grouped_df["requests"], color="skyblue", alpha=0.4)
 
-        get_graph_labels(route, metric)
+        get_graph_labels("", metric)
 
         plt.xticks(rotation=30)
         plt.tight_layout()
 
-        if not route == "/":
-            filename = f"{output_dir}{metric}_{route.lstrip('/').replace('/', '_')}.png"
-        else:
-            filename = f"{output_dir}{metric}_root.png"
+        filename = f"{output_dir}{metric}_all_routes.png"
 
         plt.savefig(filename)
 
@@ -191,6 +206,31 @@ def generate_line_graph(data: List[dict[str, Any]], group_by: str, metric: str, 
             plt.show()
 
         plt.close()
+
+    else:
+        for route, route_data in grouped_df.groupby("uid"):
+            plt.figure(figsize=(10, 6))
+
+            route_data["timestamp"] = route_data["timestamp"].dt.strftime("%H:%M:%S")
+            plt.plot(route_data["timestamp"], route_data["requests"], label=route)
+            plt.fill_between(route_data["timestamp"], route_data["requests"], color="skyblue", alpha=0.4)
+
+            get_graph_labels(route, metric)
+
+            plt.xticks(rotation=30)
+            plt.tight_layout()
+
+            if not route == "/":
+                filename = f"{output_dir}{metric}_{route.lstrip('/').replace('/', '_')}.png"
+            else:
+                filename = f"{output_dir}{metric}_root.png"
+
+            plt.savefig(filename)
+
+            if show:
+                plt.show()
+
+            plt.close()
 
 
 def run_call_graph() -> None:
@@ -253,18 +293,22 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating graphs...")
 
-    generate_line_graph(sliced_data, group_by, "page_requests", show)
-    generate_line_graph(sliced_data, group_by, "error_count", show)
-    generate_line_graph(sliced_data, group_by, "error_count", show)
+    # generate_line_graph(sliced_data, group_by, "page_requests", show)
+    # generate_line_graph(sliced_data, group_by, "error_count", show)
+    generate_line_graph(sliced_data, group_by, "fs_read", show, True)
+    generate_line_graph(sliced_data, group_by, "fs_write", show, True)
+    generate_line_graph(sliced_data, group_by, "voluntary_context_switches", show, True)
 
-    generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
+    # generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
+    # generate_pairplot(sliced_data, "fs_read", "fs_write", show)
+    # generate_pairplot(sliced_data, "user_cpu_usage", "system_cpu_usage", show)
 
-    generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
-    generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
-
-    if show:
-        perun_log.minor_info("Generating call graph...")
-        perun_log.minor_info("This call graph works for typescript files only...")
-        run_call_graph()
+    # generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+    # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
+    #
+    # if show:
+    #     perun_log.minor_info("Generating call graph...")
+    #     perun_log.minor_info("This call graph works for typescript files only...")
+    #     run_call_graph()
 
     perun_log.minor_info("Generating graphs finished...")
