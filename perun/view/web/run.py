@@ -344,10 +344,10 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating line graphs...")
 
-    # generate_line_graph(sliced_data, "page_requests", show, group_by)
-    # generate_line_graph(sliced_data, "fs_read", show, group_by, True)
-    # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
-    # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
+    generate_line_graph(sliced_data, "page_requests", show, group_by)
+    generate_line_graph(sliced_data, "fs_read", show, group_by, True)
+    generate_line_graph(sliced_data, "fs_write", show, group_by, True)
+    generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
 
     perun_log.minor_info("Generating pairplots...")
 
