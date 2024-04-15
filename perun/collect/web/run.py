@@ -14,42 +14,12 @@ import subprocess
 import perun.logic.runner as runner
 
 from time import sleep
-from typing import Any, List, Tuple, Dict
 from datetime import datetime
 from perun.utils import log as perun_log
+from typing import Any, List, Tuple, Dict
 from perun.utils.external import processes
 from perun.collect.web.parser import Parser
 from perun.utils.structs import CollectStatus, Executable
-from perun.collect.web.build_exception import BuildException
-
-
-def before(executable: Executable, **kwargs: Any) -> Tuple[CollectStatus, str, Dict[str, Any]]:
-    """Validates, initializes and normalizes the collection configuration.
-
-    :param Executable executable: full collection command with arguments and workload
-    :param kwargs: dictionary containing the supplied configuration settings for the collector
-    :returns: tuple (CollectStatus enum code,
-                    string as a status message, mainly for error states,
-                    dict of kwargs (possibly with some new values))
-    """
-
-    perun_log.minor_info("Pre-processing phase...")
-    perun_log.minor_info("Checking if target project is built...")
-
-    project_path = kwargs["proj"]
-    kwargs["prof_port"] = 9000
-
-    build_dir = os.path.join(project_path, "build")
-    dist_dir = os.path.join(project_path, "dist")
-    out_dir = os.path.join(project_path, "out")
-
-    if not os.path.exists(build_dir) and not os.path.exists(dist_dir) and not os.path.exists(out_dir):
-        raise BuildException(
-            "Build directory does not, please build your application before profiling.\n"
-            "Supported build directories are 'build', 'dist', 'out'\n"
-        )
-
-    return CollectStatus.OK, "", dict(kwargs)
 
 
 def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
@@ -65,6 +35,7 @@ def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     project_path = kwargs["proj"]
     express_file = kwargs["express"]
     timeout = kwargs["timeout"]
+    kwargs["prof_port"] = 9000
     project_port = kwargs["port"]
     profiler_port = kwargs["prof_port"]
     profiler_path = kwargs["otp"]
