@@ -18,6 +18,5 @@ COLLECTOR_DEFAULT_UNITS = {
     "system_cpu_time":            "s",
     "fs_read":                    "",
     "fs_write":                   "",
-    "voluntary_context_switches": ""
-
+    "voluntary_context_switches": "",
 }

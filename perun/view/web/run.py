@@ -43,30 +43,32 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df = pd.DataFrame(data)
 
     # parse data
+    amount_group_by = 100
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
     df["amount"] = pd.to_numeric(df["amount"])
+    df["amount_agg"] = (df["amount"] // amount_group_by) * amount_group_by
     df["count"] = 1
 
     df_filtered = df[df["type"] == metric]
-    df_agg = df_filtered.groupby(["time", "amount"]).count().reset_index()
+    df_agg = df_filtered.groupby(["time", "amount_agg"]).count().reset_index()
 
     max_count = df_agg["count"].max()
     df_agg["normalized_count"] = df_agg["count"] / max_count
 
     # fill missing data
     time_range = df_agg["time"].unique()
-    amount_range = df_agg["amount"].unique()
-    index = pd.MultiIndex.from_product([time_range, amount_range], names=["time", "amount"])
+    amount_range = df_agg["amount_agg"].unique()
+    index = pd.MultiIndex.from_product([time_range, amount_range], names=["time", "amount_agg"])
     df_all_combinations = pd.DataFrame(index=index).reset_index()
 
-    df_merged = df_all_combinations.merge(df_agg, on=["time", "amount"], how="left")
-    df_merged["normalized_count"] = df_merged["normalized_count"].fillna(0)
+    df_merged = df_all_combinations.merge(df_agg, on=["time", "amount_agg"], how="left")
+    df_merged.loc[:, 'normalized_count'] = df_merged['normalized_count'].fillna(0)
 
     # plot heatmap
-    ds = hv.Dataset(data=df_merged, kdims=["time", "amount"], vdims=["normalized_count"])
-    heatmap = ds.to(hv.HeatMap, ["time", "amount"], "normalized_count")
+    ds = hv.Dataset(data=df_merged, kdims=["time", "amount_agg"], vdims=["normalized_count"])
+    heatmap = ds.to(hv.HeatMap, ["time", "amount_agg"], "normalized_count")
 
     cmap = ["black", "red", "orange", "yellow"]
     cmap = LinearSegmentedColormap.from_list("cmap", cmap)
@@ -218,7 +220,7 @@ def generate_line_graph(
         group_by (str): The time interval for grouping the data.
         metric (str): The metric to be visualized.
         show (bool): Whether to display the line graph.
-
+        for_all_routes (bool) Make 1 graph for all routes combined
     Returns:
         None
     """
@@ -344,27 +346,27 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating line graphs...")
 
-    generate_line_graph(sliced_data, "page_requests", show, group_by)
-    generate_line_graph(sliced_data, "fs_read", show, group_by, True)
-    generate_line_graph(sliced_data, "fs_write", show, group_by, True)
-    generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
+    # generate_line_graph(sliced_data, "page_requests", show, group_by)
+    # generate_line_graph(sliced_data, "fs_read", show, group_by, True)
+    # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
+    # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
 
     perun_log.minor_info("Generating pairplots...")
 
-    generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
-    generate_pairplot(sliced_data, "fs_read", "fs_write", show)
-    generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
-    generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
-    generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
+    # generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
+    # generate_pairplot(sliced_data, "fs_read", "fs_write", show)
+    # generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
+    # generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
+    # generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
 
     perun_log.minor_info("Generating heatmaps...")
 
     generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
-    generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
+    # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
 
-    if show:
-        perun_log.minor_info("Generating call graph...")
-        perun_log.minor_info("This call graph works for typescript files only...")
-        run_call_graph()
+    # if show:
+    #     perun_log.minor_info("Generating call graph...")
+    #     perun_log.minor_info("This call graph works for typescript files only...")
+    #     run_call_graph()
 
     perun_log.minor_info("Generating graphs finished...")
