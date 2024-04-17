@@ -23,7 +23,44 @@ from perun.view.web.unsupported_metric_exception import UnsupportedMetricExcepti
 output_dir = "view/"
 
 
-def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "10s") -> None:
+def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "1min") -> None:
+
+    hv.extension("bokeh")
+
+    df = pd.DataFrame(data)
+    df_filtered = df[df["type"] == metric].copy()
+    df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"])
+
+    df_grouped = df_filtered.groupby(['uid', pd.Grouper(key='timestamp', freq=group_by)]).sum().reset_index()
+    df_grouped['timestamp'] = df_grouped['timestamp'].dt.strftime('%H:%M:%S')
+    df_grouped = df_grouped[['timestamp', 'uid', 'amount']]
+
+    ds = hv.Dataset(df_grouped)
+
+    heatmap = ds.to(hv.HeatMap, ['timestamp', 'uid'], 'amount')
+
+    cmap = ["black", "red", "orange", "yellow"]
+    cmap = LinearSegmentedColormap.from_list("cmap", cmap)
+
+    heatmap_opts = {
+        'tools': ['hover'],
+        'colorbar': True,
+        'width': 800,
+        'toolbar': 'above',
+        'cmap': cmap,
+    }
+
+    heatmap = heatmap.opts(**heatmap_opts)
+
+    filename = output_dir + metric + "_routeHeatmap.html"
+    hv.render(heatmap)
+    hv.save(heatmap, filename)
+
+    if show:
+        webbrowser.open(filename)
+
+
+def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "1min") -> None:
     """Heatmap for supported metrics of web collector
     You need to define labels for new metric in `get_graph_labels`, if it is not done already.
     https://holoviews.org/reference/elements/plotly/HeatMap.html
@@ -380,10 +417,10 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating line graphs...")
 
-    # generate_line_graph(sliced_data, "page_requests", show, group_by)
-    # generate_line_graph(sliced_data, "fs_read", show, group_by, True)
-    # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
-    # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
+    generate_line_graph(sliced_data, "page_requests", show, group_by)
+    generate_line_graph(sliced_data, "fs_read", show, group_by, True)
+    generate_line_graph(sliced_data, "fs_write", show, group_by, True)
+    generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
 
     perun_log.minor_info("Generating pairplot...")
 
@@ -391,12 +428,14 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating heatmaps...")
 
-    # generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
-    # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
+    generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+    generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
 
-    # if show:
-    #     perun_log.minor_info("Generating call graph...")
-    #     perun_log.minor_info("This call graph works for typescript files only...")
-    #     run_call_graph()
+    generate_route_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+
+    if show:
+        perun_log.minor_info("Generating call graph...")
+        perun_log.minor_info("This call graph works for typescript files only...")
+        run_call_graph()
 
     perun_log.minor_info("Generating graphs finished...")
