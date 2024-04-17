@@ -43,7 +43,7 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df = pd.DataFrame(data)
 
     # parse data
-    amount_group_by = 100
+    amount_group_by = 125
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
@@ -125,14 +125,13 @@ def get_pairplot_labels(metric: str, data: Any) -> Dict[str, Any]:
             raise UnsupportedMetricException(f"Labels for metric {metric} are not specified")
 
 
-def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, show: bool) -> None:
+def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
     """Generate a pairplot Matrix (SPLOM) for exploring relationships between multiple metrics in the given dataset.
        https://seaborn.pydata.org/generated/seaborn.pairplot.html
+       Brute force 9 metrics statically
 
     Parameters:
         data (List[dict[str, Any]]): The dataset as a list of dictionaries.
-        metric1 (str): The first metric to be compared.
-        metric2 (str): The second metric to be compared.
         show (bool): Flag indicating whether to display the pairplot or not.
 
     Returns:
@@ -143,27 +142,62 @@ def generate_pairplot(data: List[dict[str, Any]], metric1: str, metric2: str, sh
 
     sns.set(style="ticks", color_codes=True)
 
-    filtered_df_metric1 = df[df["type"] == metric1].copy()
-    filtered_df_metric2 = df[df["type"] == metric2].copy()
+    filtered_df_metric1 = df[df["type"] == "memory_usage_counter"].copy()
+    filtered_df_metric2 = df[df["type"] == "request_latency_summary"].copy()
+    filtered_df_metric3 = df[df["type"] == "user_cpu_usage"].copy()
+    filtered_df_metric4 = df[df["type"] == "system_cpu_usage"].copy()
+    filtered_df_metric5 = df[df["type"] == "user_cpu_time"].copy()
+    filtered_df_metric6 = df[df["type"] == "system_cpu_time"].copy()
+    filtered_df_metric7 = df[df["type"] == "fs_read"].copy()
+    filtered_df_metric8 = df[df["type"] == "fs_write"].copy()
+    filtered_df_metric9 = df[df["type"] == "voluntary_context_switches"].copy()
 
     filtered_df_metric1.reset_index(drop=True, inplace=True)
     filtered_df_metric2.reset_index(drop=True, inplace=True)
+    filtered_df_metric3.reset_index(drop=True, inplace=True)
+    filtered_df_metric4.reset_index(drop=True, inplace=True)
+    filtered_df_metric5.reset_index(drop=True, inplace=True)
+    filtered_df_metric6.reset_index(drop=True, inplace=True)
+    filtered_df_metric7.reset_index(drop=True, inplace=True)
+    filtered_df_metric8.reset_index(drop=True, inplace=True)
+    filtered_df_metric9.reset_index(drop=True, inplace=True)
 
-    labels_metric1 = get_pairplot_labels(metric1, filtered_df_metric1["amount"])
-    labels_metric2 = get_pairplot_labels(metric2, filtered_df_metric2["amount"])
+    labels_metric1 = get_pairplot_labels("memory_usage_counter", filtered_df_metric1["amount"])
+    labels_metric2 = get_pairplot_labels("request_latency_summary", filtered_df_metric2["amount"])
+    labels_metric3 = get_pairplot_labels("user_cpu_usage", filtered_df_metric3["amount"])
+    labels_metric4 = get_pairplot_labels("system_cpu_usage", filtered_df_metric4["amount"])
+    labels_metric5 = get_pairplot_labels("user_cpu_time", filtered_df_metric5["amount"])
+    labels_metric6 = get_pairplot_labels("system_cpu_time", filtered_df_metric6["amount"])
+    labels_metric7 = get_pairplot_labels("fs_read", filtered_df_metric7["amount"])
+    labels_metric8 = get_pairplot_labels("fs_write", filtered_df_metric8["amount"])
+    labels_metric9 = get_pairplot_labels("voluntary_context_switches", filtered_df_metric9["amount"])
 
     combined_df = pd.DataFrame({
         **labels_metric1,
         **labels_metric2,
+        **labels_metric3,
+        **labels_metric4,
+        **labels_metric5,
+        **labels_metric6,
+        **labels_metric7,
+        **labels_metric8,
+        **labels_metric9,
     })
 
-    sns.set(rc={'figure.figsize': (10, 10)})
-    pairplot = sns.pairplot(combined_df)
+    sns.set(rc={'figure.figsize': (5, 5)})
+    sns.set_context("paper", rc={"axes.labelsize": 6})
+    pairplot = sns.pairplot(combined_df, aspect=0.5)
+
+    for ax in pairplot.axes.flatten():
+        ax.tick_params(axis='x', labelsize=6)
+        ax.tick_params(axis='y', labelsize=6)
+        ax.locator_params(axis='x', nbins=3)
+        ax.locator_params(axis='y', nbins=3)
 
     if show:
         plt.show()
 
-    pairplot.savefig(f"{output_dir}pairplot_{metric1}_{metric2}.png")
+    pairplot.savefig(f"{output_dir}pairplot.png")
 
 
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
@@ -209,7 +243,7 @@ def generate_line_graph(
         data: List[dict[str, Any]],
         metric: str,
         show: bool,
-        group_by: str = "10s",
+        group_by: str = "1min",
         for_all_routes: bool = False
 ) -> None:
     """Generate line graph for metrics without unit. Plot graph for number of occurrences.
@@ -351,17 +385,13 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
     # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
 
-    perun_log.minor_info("Generating pairplots...")
+    perun_log.minor_info("Generating pairplot...")
 
-    # generate_pairplot(sliced_data, "memory_usage_counter", "request_latency_summary", show)
-    # generate_pairplot(sliced_data, "fs_read", "fs_write", show)
-    # generate_pairplot(sliced_data, "user_cpu_usage", "user_cpu_time", show)
-    # generate_pairplot(sliced_data, "user_cpu_time", "system_cpu_time", show)
-    # generate_pairplot(sliced_data, "voluntary_context_switches", "system_cpu_time", show)
+    generate_pairplot(sliced_data, show)
 
     perun_log.minor_info("Generating heatmaps...")
 
-    generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+    # generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
     # generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
 
     # if show:
