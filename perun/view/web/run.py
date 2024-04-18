@@ -5,7 +5,6 @@ import click
 import shlex
 import subprocess
 import webbrowser
-
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -24,6 +23,18 @@ output_dir = "view/"
 
 
 def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_by: str = "1min") -> None:
+    """
+    Generate a heatmap visualization of route data based on a given metric.
+
+    Parameters:
+        data (List[dict[str, Any]]): The dataset as a list of dictionaries.
+        metric (str): The metric for which the heatmap is to be generated.
+        show (bool): Flag indicating whether to display the heatmap in the browser.
+        group_by (str, optional): The time interval for grouping the data. Defaults to "1min".
+
+    Returns:
+        None
+    """
 
     hv.extension("bokeh")
 
@@ -34,23 +45,25 @@ def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, 
     df_grouped = df_filtered.groupby(['uid', pd.Grouper(key='timestamp', freq=group_by)]).sum().reset_index()
     df_grouped['timestamp'] = df_grouped['timestamp'].dt.strftime('%H:%M:%S')
     df_grouped = df_grouped[['timestamp', 'uid', 'amount']]
+    df_grouped = (df_grouped.pivot(index='uid', columns='timestamp', values='amount')
+                  .fillna(0).stack().reset_index(name='amount'))
 
     ds = hv.Dataset(df_grouped)
 
-    heatmap = ds.to(hv.HeatMap, ['timestamp', 'uid'], 'amount')
+    heatmap = ds.to(hv.HeatMap, ['timestamp', 'uid'], 'amount').sort()
 
-    cmap = ["black", "red", "orange", "yellow"]
-    cmap = LinearSegmentedColormap.from_list("cmap", cmap)
+    labels = hv.Labels(heatmap).opts(padding=0, text_color='skyblue')
 
+    bg_cmap = ["black", "red", "orange", "yellow"]
+    bg_cmap = LinearSegmentedColormap.from_list("bg_cmap", bg_cmap)
+
+    heatmap.opts(opts.HeatMap(tools=['hover'], colorbar=True, width=800, toolbar='above', cmap=bg_cmap, colorbar_opts={'title': 'Memory (MB)'}))
     heatmap_opts = {
-        'tools': ['hover'],
-        'colorbar': True,
-        'width': 800,
-        'toolbar': 'above',
-        'cmap': cmap,
+        'ylabel': 'Route UID',
+        'xlabel': 'Time (hh:mm:ss)',
     }
 
-    heatmap = heatmap.opts(**heatmap_opts)
+    heatmap = (heatmap * labels).opts(**heatmap_opts)
 
     filename = output_dir + metric + "_routeHeatmap.html"
     hv.render(heatmap)
@@ -129,37 +142,42 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
         webbrowser.open(filename)
 
 
-def get_pairplot_labels(metric: str, data: Any) -> Dict[str, Any]:
+def get_pairplot_labels(metric: str, amount: pd.Series, uid: pd.Series) -> pd.DataFrame:
     """Generate pairplot labels for the given metric and data.
 
     Parameters:
         metric (str): The metric for which labels are to be generated.
-        data (Any): The data associated with the metric.
+        amount (pd.Series): The amount data associated with the metric.
+        uid (pd.Series): The unique identifier associated with each data point.
 
     Returns:
-        Dict[str, Any]: A dictionary containing pairplot labels for the given metric and data.
+        pd.DataFrame: A DataFrame containing pairplot labels for the given metric and data.
     """
-    match metric:
-        case "memory_usage_counter":
-            return {"Memory_amount (MB)": data}
-        case "request_latency_summary":
-            return {"Latency amount (ms)": data}
-        case "user_cpu_usage":
-            return {"User CPU Usage (s)": data}
-        case "system_cpu_usage":
-            return {"System CPU Usage (s)": data}
-        case "user_cpu_time":
-            return {"User CPU Time (s)": data}
-        case "system_cpu_time":
-            return {"System CPU Time (s)": data}
-        case "fs_read":
-            return {"FS Read": data}
-        case "fs_write":
-            return {"FS Write": data}
-        case "voluntary_context_switches":
-            return {"Voluntary Context Switches": data}
-        case _:
-            raise UnsupportedMetricException(f"Labels for metric {metric} are not specified")
+    labels = []
+    for am, uid_val in zip(amount, uid):
+        match metric:
+            case "memory_usage_counter":
+                label = {"Memory_amount (MB)": am, "Routes": uid_val}
+            case "request_latency_summary":
+                label = {"Latency amount (ms)": am, "Routes": uid_val}
+            case "user_cpu_usage":
+                label = {"User CPU Usage (s)": am, "Routes": uid_val}
+            case "system_cpu_usage":
+                label = {"System CPU Usage (s)": am, "Routes": uid_val}
+            case "user_cpu_time":
+                label = {"User CPU Time (s)": am, "Routes": uid_val}
+            case "system_cpu_time":
+                label = {"System CPU Time (s)": am, "Routes": uid_val}
+            case "fs_read":
+                label = {"FS Read": am, "Routes": uid_val}
+            case "fs_write":
+                label = {"FS Write": am, "Routes": uid_val}
+            case "voluntary_context_switches":
+                label = {"Voluntary Context Switches": am, "Routes": uid_val}
+            case _:
+                raise UnsupportedMetricException(f"Labels for metric {metric} are not specified")
+        labels.append(label)
+    return pd.DataFrame(labels)
 
 
 def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
@@ -179,51 +197,19 @@ def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
 
     sns.set(style="ticks", color_codes=True)
 
-    filtered_df_metric1 = df[df["type"] == "memory_usage_counter"].copy()
-    filtered_df_metric2 = df[df["type"] == "request_latency_summary"].copy()
-    filtered_df_metric3 = df[df["type"] == "user_cpu_usage"].copy()
-    filtered_df_metric4 = df[df["type"] == "system_cpu_usage"].copy()
-    filtered_df_metric5 = df[df["type"] == "user_cpu_time"].copy()
-    filtered_df_metric6 = df[df["type"] == "system_cpu_time"].copy()
-    filtered_df_metric7 = df[df["type"] == "fs_read"].copy()
-    filtered_df_metric8 = df[df["type"] == "fs_write"].copy()
-    filtered_df_metric9 = df[df["type"] == "voluntary_context_switches"].copy()
+    labels = []
+    for metric in ["memory_usage_counter", "request_latency_summary", "user_cpu_usage", "system_cpu_usage",
+                   "user_cpu_time", "system_cpu_time", "fs_read", "fs_write", "voluntary_context_switches"]:
+        filtered_df = df[df["type"] == metric].copy()
+        filtered_df.reset_index(drop=True, inplace=True)
+        labels_metric = get_pairplot_labels(metric, filtered_df["amount"], filtered_df["uid"])
+        labels.append(labels_metric)
 
-    filtered_df_metric1.reset_index(drop=True, inplace=True)
-    filtered_df_metric2.reset_index(drop=True, inplace=True)
-    filtered_df_metric3.reset_index(drop=True, inplace=True)
-    filtered_df_metric4.reset_index(drop=True, inplace=True)
-    filtered_df_metric5.reset_index(drop=True, inplace=True)
-    filtered_df_metric6.reset_index(drop=True, inplace=True)
-    filtered_df_metric7.reset_index(drop=True, inplace=True)
-    filtered_df_metric8.reset_index(drop=True, inplace=True)
-    filtered_df_metric9.reset_index(drop=True, inplace=True)
-
-    labels_metric1 = get_pairplot_labels("memory_usage_counter", filtered_df_metric1["amount"])
-    labels_metric2 = get_pairplot_labels("request_latency_summary", filtered_df_metric2["amount"])
-    labels_metric3 = get_pairplot_labels("user_cpu_usage", filtered_df_metric3["amount"])
-    labels_metric4 = get_pairplot_labels("system_cpu_usage", filtered_df_metric4["amount"])
-    labels_metric5 = get_pairplot_labels("user_cpu_time", filtered_df_metric5["amount"])
-    labels_metric6 = get_pairplot_labels("system_cpu_time", filtered_df_metric6["amount"])
-    labels_metric7 = get_pairplot_labels("fs_read", filtered_df_metric7["amount"])
-    labels_metric8 = get_pairplot_labels("fs_write", filtered_df_metric8["amount"])
-    labels_metric9 = get_pairplot_labels("voluntary_context_switches", filtered_df_metric9["amount"])
-
-    combined_df = pd.DataFrame({
-        **labels_metric1,
-        **labels_metric2,
-        **labels_metric3,
-        **labels_metric4,
-        **labels_metric5,
-        **labels_metric6,
-        **labels_metric7,
-        **labels_metric8,
-        **labels_metric9,
-    })
+    combined_df = pd.concat(labels)
 
     sns.set(rc={'figure.figsize': (5, 5)})
     sns.set_context("paper", rc={"axes.labelsize": 6})
-    pairplot = sns.pairplot(combined_df, aspect=0.5)
+    pairplot = sns.pairplot(combined_df, aspect=0.5, hue='Routes')
 
     for ax in pairplot.axes.flatten():
         ax.tick_params(axis='x', labelsize=6)
@@ -235,6 +221,7 @@ def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
         plt.show()
 
     pairplot.savefig(f"{output_dir}pairplot.png")
+
 
 
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
