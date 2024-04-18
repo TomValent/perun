@@ -42,14 +42,13 @@ def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, 
     df_filtered = df[df["type"] == metric].copy()
     df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"])
 
-    df_grouped = df_filtered.groupby(['uid', pd.Grouper(key='timestamp', freq=group_by)]).sum().reset_index()
+    df_grouped = df_filtered.groupby(['uid', pd.Grouper(key='timestamp', freq=group_by)])['amount'].mean().reset_index()
     df_grouped['timestamp'] = df_grouped['timestamp'].dt.strftime('%H:%M:%S')
-    df_grouped = df_grouped[['timestamp', 'uid', 'amount']]
-    df_grouped = (df_grouped.pivot(index='uid', columns='timestamp', values='amount')
-                  .fillna(0).stack().reset_index(name='amount'))
 
-    ds = hv.Dataset(df_grouped)
+    df_pivoted = df_grouped.pivot(index='uid', columns='timestamp', values='amount').fillna(0)
+    df_combined = df_pivoted.stack().reset_index(name='amount')
 
+    ds = hv.Dataset(df_combined)
     heatmap = ds.to(hv.HeatMap, ['timestamp', 'uid'], 'amount').sort()
 
     labels = hv.Labels(heatmap).opts(padding=0, text_color='skyblue')
@@ -57,7 +56,15 @@ def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, 
     bg_cmap = ["black", "red", "orange", "yellow"]
     bg_cmap = LinearSegmentedColormap.from_list("bg_cmap", bg_cmap)
 
-    heatmap.opts(opts.HeatMap(tools=['hover'], colorbar=True, width=800, toolbar='above', cmap=bg_cmap, colorbar_opts={'title': 'Memory (MB)'}))
+    heatmap.opts(opts.HeatMap(
+        tools=['hover'],
+        colorbar=True,
+        width=800,
+        toolbar='above',
+        cmap=bg_cmap,
+        colorbar_opts={'title': 'Memory (MB)'}
+        )
+    )
     heatmap_opts = {
         'ylabel': 'Route UID',
         'xlabel': 'Time (hh:mm:ss)',
@@ -91,18 +98,25 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     hv.extension("bokeh")
 
     df = pd.DataFrame(data)
+    df = df[df["type"] == metric]
 
     # parse data
-    amount_group_by = 150
+    amount_group_by = 0
+
+    if metric == "memory_usage_counter":
+        amount_group_by = 5
+    elif metric == "request_latency_summary":
+        amount_group_by = 500
+    print(df["amount"].max(), df["amount"].min())
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
-    df["amount"] = pd.to_numeric(df["amount"])
+    df["amount"] = pd.to_numeric(df["amount"], errors='coerce')
     df["amount_agg"] = (df["amount"] // amount_group_by) * amount_group_by
+
     df["count"] = 1
 
-    df_filtered = df[df["type"] == metric]
-    df_agg = df_filtered.groupby(["time", "amount_agg"]).count().reset_index()
+    df_agg = df.groupby(["time", "amount_agg"]).count().reset_index()
 
     max_count = df_agg["count"].max()
     df_agg["normalized_count"] = df_agg["count"] / max_count
@@ -200,7 +214,7 @@ def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
     labels = []
     for metric in ["memory_usage_counter", "request_latency_summary", "user_cpu_usage", "system_cpu_usage",
                    "user_cpu_time", "system_cpu_time", "fs_read", "fs_write", "voluntary_context_switches"]:
-        filtered_df = df[df["type"] == metric].copy()
+        filtered_df = df[df["type"] == metric]
         filtered_df.reset_index(drop=True, inplace=True)
         labels_metric = get_pairplot_labels(metric, filtered_df["amount"], filtered_df["uid"])
         labels.append(labels_metric)
@@ -404,14 +418,14 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating line graphs...")
 
-    generate_line_graph(sliced_data, "page_requests", show, group_by)
-    generate_line_graph(sliced_data, "fs_read", show, group_by, True)
-    generate_line_graph(sliced_data, "fs_write", show, group_by, True)
-    generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
-
+    # generate_line_graph(sliced_data, "page_requests", show, group_by)
+    # generate_line_graph(sliced_data, "fs_read", show, group_by, True)
+    # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
+    # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
+    #
     perun_log.minor_info("Generating pairplot...")
-
-    generate_pairplot(sliced_data, show)
+    #
+    # generate_pairplot(sliced_data, show)
 
     perun_log.minor_info("Generating heatmaps...")
 
@@ -423,6 +437,6 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     if show:
         perun_log.minor_info("Generating call graph...")
         perun_log.minor_info("This call graph works for typescript files only...")
-        run_call_graph()
+        # run_call_graph()
 
     perun_log.minor_info("Generating graphs finished...")
