@@ -93,7 +93,7 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df = pd.DataFrame(data)
 
     # parse data
-    amount_group_by = 125
+    amount_group_by = 150
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
