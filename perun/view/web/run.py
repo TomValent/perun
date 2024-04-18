@@ -107,7 +107,7 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
         amount_group_by = 5
     elif metric == "request_latency_summary":
         amount_group_by = 500
-    print(df["amount"].max(), df["amount"].min())
+
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
@@ -194,13 +194,13 @@ def get_pairplot_labels(metric: str, amount: pd.Series, uid: pd.Series) -> pd.Da
     return pd.DataFrame(labels)
 
 
-def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
+def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool) -> None:
     """Generate a pairplot Matrix (SPLOM) for exploring relationships between multiple metrics in the given dataset.
        https://seaborn.pydata.org/generated/seaborn.pairplot.html
-       Brute force 9 metrics statically
 
     Parameters:
         data (List[dict[str, Any]]): The dataset as a list of dictionaries.
+        metrics (List[str]): List of metric to be used in pairplot.
         show (bool): Flag indicating whether to display the pairplot or not.
 
     Returns:
@@ -212,8 +212,7 @@ def generate_pairplot(data: List[dict[str, Any]], show: bool) -> None:
     sns.set(style="ticks", color_codes=True)
 
     labels = []
-    for metric in ["memory_usage_counter", "request_latency_summary", "user_cpu_usage", "system_cpu_usage",
-                   "user_cpu_time", "system_cpu_time", "fs_read", "fs_write", "voluntary_context_switches"]:
+    for metric in metrics:
         filtered_df = df[df["type"] == metric]
         filtered_df.reset_index(drop=True, inplace=True)
         labels_metric = get_pairplot_labels(metric, filtered_df["amount"], filtered_df["uid"])
@@ -418,14 +417,27 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
 
     perun_log.minor_info("Generating line graphs...")
 
-    # generate_line_graph(sliced_data, "page_requests", show, group_by)
-    # generate_line_graph(sliced_data, "fs_read", show, group_by, True)
-    # generate_line_graph(sliced_data, "fs_write", show, group_by, True)
-    # generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
-    #
+    generate_line_graph(sliced_data, "page_requests", show, group_by)
+    generate_line_graph(sliced_data, "fs_read", show, group_by, True)
+    generate_line_graph(sliced_data, "fs_write", show, group_by, True)
+    generate_line_graph(sliced_data, "voluntary_context_switches", show, group_by, True)
+
     perun_log.minor_info("Generating pairplot...")
-    #
-    # generate_pairplot(sliced_data, show)
+
+    generate_pairplot(
+        sliced_data,
+        [
+            "memory_usage_counter",
+            "request_latency_summary",
+            "user_cpu_usage", "system_cpu_usage",
+            "user_cpu_time",
+            "system_cpu_time",
+            "fs_read",
+            "fs_write",
+            "voluntary_context_switches"
+        ],
+        show
+    )
 
     perun_log.minor_info("Generating heatmaps...")
 
@@ -437,6 +449,6 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     if show:
         perun_log.minor_info("Generating call graph...")
         perun_log.minor_info("This call graph works for typescript files only...")
-        # run_call_graph()
+        run_call_graph()
 
     perun_log.minor_info("Generating graphs finished...")
