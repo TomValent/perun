@@ -5,16 +5,15 @@ import click
 import shlex
 import subprocess
 import webbrowser
-import numpy as np
 import pandas as pd
 import seaborn as sns
 import holoviews as hv
 import perun.profile.factory as profile_factory
 
 from holoviews import opts
-from typing import Any, List, Union, Dict
 from matplotlib import pyplot as plt
 from perun.utils import log as perun_log
+from typing import Any, List, Union, Dict
 from matplotlib.colors import LinearSegmentedColormap
 from perun.view.web.unsupported_metric_exception import UnsupportedMetricException
 
@@ -322,9 +321,9 @@ def generate_line_graph(
         plt.xticks(rotation=30)
         plt.tight_layout()
 
-        filename = f"{output_dir}{metric}_all_routes.png"
+        filename = f"{output_dir}{metric}_all_routes.svg"
 
-        plt.savefig(filename)
+        plt.savefig(filename, format='svg')
 
         if show:
             plt.show()
@@ -345,11 +344,11 @@ def generate_line_graph(
             plt.tight_layout()
 
             if not route == "/":
-                filename = f"{output_dir}{metric}_{route.lstrip('/').replace('/', '_')}.png"
+                filename = f"{output_dir}{metric}_{route.lstrip('/').replace('/', '_')}.svg"
             else:
-                filename = f"{output_dir}{metric}_root.png"
+                filename = f"{output_dir}{metric}_root.svg"
 
-            plt.savefig(filename)
+            plt.savefig(filename, format='svg')
 
             if show:
                 plt.show()

@@ -14,12 +14,12 @@ import subprocess
 import perun.logic.runner as runner
 
 from time import sleep
+from typing import Any, List
 from datetime import datetime
 from perun.utils import log as perun_log
-from typing import Any, List, Tuple, Dict
 from perun.utils.external import processes
 from perun.collect.web.parser import Parser
-from perun.utils.structs import CollectStatus, Executable
+from perun.utils.structs import CollectStatus
 
 
 def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
@@ -40,6 +40,10 @@ def collect(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     profiler_port = kwargs["prof_port"]
     profiler_path = kwargs["otp"]
     command = "start"
+
+    if project_path == "":
+        project_path = os.getcwd() + "/"
+        print(project_path)
 
     with processes.nonblocking_subprocess(
             "yarn " + command + " --silent " + "--path " + project_path + express_file,
@@ -176,18 +180,19 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     "--proj",
     "-p",
     type=str,
-    required=True,
+    required=False,
     default="",
     help="Path to the project to be profiled"
+         "If it's not given actual directory is used"
 )
 @click.option(
     "--express",
     "-e",
     type=str,
     required=True,
-    help="Path to file in your project\n"
-         "containing express() app with export\n"
-         "export must be default or named 'app'"
+    help="Path to file in your project containing express() app with export\n"
+         "export must be default or named 'app'\n"
+         "Examples: 'src/app', 'src/app.ts'"
 )
 @click.option(
     "--port",
