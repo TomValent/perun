@@ -384,12 +384,12 @@ def run_call_graph() -> None:
     "-g",
     default="1min",
     required=False,
-    help="Group by values in graphs by time span\n"
-         "For example group values by:"
-         "`5s`   - 5 seconds"
-         "`1min` - 1 minute"
-         "1h     - 1 hour"
-         "1D     - 1 day"
+    help="Group by values in graphs by period.\n"
+         "For example group values by:\n"
+         "5s   - 5 seconds\n"
+         "1min - 1 minute\n"
+         "1h     - 1 hour\n"
+         "1D     - 1 day\n"
 )
 @click.option(
     "--show",
@@ -397,7 +397,7 @@ def run_call_graph() -> None:
     default=False,
     required=False,
     is_flag=True,
-    help="Show generated graphs and call graph."
+    help="Show generated graphs and call graph.\n"
          "Graphs will be saved in any case to current directory."
 )
 @profile_factory.pass_profile
