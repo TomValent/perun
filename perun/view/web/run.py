@@ -384,7 +384,7 @@ def run_call_graph() -> None:
     default="1min",
     required=False,
     help="Group by values in graphs by period.\n"
-         "Default is 1 minute.\n"
+         "The default is 1 minute.\n"
          "For example group values by:\n"
          "5s   - 5 seconds\n"
          "1min - 1 minute\n"
@@ -398,7 +398,7 @@ def run_call_graph() -> None:
     required=False,
     is_flag=True,
     help="Show generated graphs and call graph.\n"
-         "Graphs will be saved in any case to current directory."
+         "Graphs will be saved in any case to the current directory."
 )
 @profile_factory.pass_profile
 def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
