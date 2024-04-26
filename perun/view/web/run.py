@@ -235,7 +235,6 @@ def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool
     pairplot.savefig(f"{output_dir}pairplot.png")
 
 
-
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
     """Function for graph labels for supported metrics.
 
@@ -385,6 +384,7 @@ def run_call_graph() -> None:
     default="1min",
     required=False,
     help="Group by values in graphs by period.\n"
+         "Default is 1 minute.\n"
          "For example group values by:\n"
          "5s   - 5 seconds\n"
          "1min - 1 minute\n"
