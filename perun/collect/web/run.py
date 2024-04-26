@@ -174,7 +174,7 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     type=str,
     required=True,
     default="",
-    help="Path to the OpenTelemetry profiler script"
+    help="Path to the OpenTelemetry profiler script."
 )
 @click.option(
     "--proj",
@@ -182,8 +182,8 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     type=str,
     required=False,
     default="",
-    help="Path to the project to be profiled\n"
-         "If it's not given actual directory is used"
+    help="Path to the project to be profiled.\n"
+         "If it's not given actual directory is used."
 )
 @click.option(
     "--express",
@@ -198,7 +198,7 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     "--port",
     type=int,
     required=True,
-    help="Port on which project run"
+    help="Port on which project run."
 )
 @click.option(
     "--timeout",
@@ -206,7 +206,8 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     type=int,
     required=False,
     default=60,
-    help="Timeout for the runtime of profiling in seconds"
+    help="Timeout for the runtime of profiling in seconds.\n"
+         "Default is seconds."
 )
 @click.pass_context
 def web(ctx: click.Context, **kwargs: Any) -> None:
