@@ -182,7 +182,7 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     type=str,
     required=False,
     default="",
-    help="Path to the project to be profiled"
+    help="Path to the project to be profiled\n"
          "If it's not given actual directory is used"
 )
 @click.option(
@@ -190,8 +190,8 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
     "-e",
     type=str,
     required=True,
-    help="Path to file in your project containing express() app with export\n"
-         "export must be default or named 'app'\n"
+    help="Path to file in your project containing express() app with export.\n"
+         "The export must be default or named 'app'\n"
          "Examples: 'src/app', 'src/app.ts'"
 )
 @click.option(
@@ -210,7 +210,9 @@ def teardown(**kwargs) -> tuple[CollectStatus, str, dict[str, Any]]:
 )
 @click.pass_context
 def web(ctx: click.Context, **kwargs: Any) -> None:
-    """Generates `web` performance profile, capturing different metrics such as latency, request
-    count or errors occurrences
+    """Generates a `web` performance profile, capturing various metrics including response latency (ms), request count,
+    error occurrences, file system activity, memory usage, throughput, user CPU usage, system CPU usage,
+    user CPU time, system CPU time, etc.
     """
+
     runner.run_collector_from_cli_context(ctx, "web", kwargs)
