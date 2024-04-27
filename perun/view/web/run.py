@@ -55,13 +55,20 @@ def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, 
     bg_cmap = ["black", "red", "orange", "yellow"]
     bg_cmap = LinearSegmentedColormap.from_list("bg_cmap", bg_cmap)
 
+    title = ""
+
+    if metric == "memory_usage_counter":
+        title = "Memory (MB)"
+    elif metric == "request_latency_summary":
+        title = "Latency (ms)"
+
     heatmap.opts(opts.HeatMap(
         tools=["hover"],
         colorbar=True,
         width=800,
         toolbar="above",
         cmap=bg_cmap,
-        colorbar_opts={"title": "Memory (MB)"}
+        colorbar_opts={"title": title}
         )
     )
     heatmap_opts = {
