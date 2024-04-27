@@ -41,32 +41,32 @@ def generate_route_heatmap(data: List[dict[str, Any]], metric: str, show: bool, 
     df_filtered = df[df["type"] == metric].copy()
     df_filtered["timestamp"] = pd.to_datetime(df_filtered["timestamp"])
 
-    df_grouped = df_filtered.groupby(['uid', pd.Grouper(key='timestamp', freq=group_by)])['amount'].mean().reset_index()
-    df_grouped['timestamp'] = df_grouped['timestamp'].dt.strftime('%H:%M:%S')
+    df_grouped = df_filtered.groupby(["uid", pd.Grouper(key="timestamp", freq=group_by)])["amount"].mean().reset_index()
+    df_grouped["timestamp"] = df_grouped["timestamp"].dt.strftime("%H:%M:%S")
 
-    df_pivoted = df_grouped.pivot(index='uid', columns='timestamp', values='amount').fillna(0)
-    df_combined = df_pivoted.stack().reset_index(name='amount')
+    df_pivoted = df_grouped.pivot(index="uid", columns="timestamp", values="amount").fillna(0)
+    df_combined = df_pivoted.stack().reset_index(name="amount")
 
     ds = hv.Dataset(df_combined)
-    heatmap = ds.to(hv.HeatMap, ['timestamp', 'uid'], 'amount').sort()
+    heatmap = ds.to(hv.HeatMap, ["timestamp", "uid"], "amount").sort()
 
-    labels = hv.Labels(heatmap).opts(padding=0, text_color='skyblue')
+    labels = hv.Labels(heatmap).opts(padding=0, text_color="skyblue")
 
     bg_cmap = ["black", "red", "orange", "yellow"]
     bg_cmap = LinearSegmentedColormap.from_list("bg_cmap", bg_cmap)
 
     heatmap.opts(opts.HeatMap(
-        tools=['hover'],
+        tools=["hover"],
         colorbar=True,
         width=800,
-        toolbar='above',
+        toolbar="above",
         cmap=bg_cmap,
-        colorbar_opts={'title': 'Memory (MB)'}
+        colorbar_opts={"title": "Memory (MB)"}
         )
     )
     heatmap_opts = {
-        'ylabel': 'Route UID',
-        'xlabel': 'Time (hh:mm:ss)',
+        "ylabel": "Route UID",
+        "xlabel": "Time (hh:mm:ss)",
     }
 
     heatmap = (heatmap * labels).opts(**heatmap_opts)
@@ -100,17 +100,12 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df = df[df["type"] == metric]
 
     # parse data
-    amount_group_by = 0
-
-    if metric == "memory_usage_counter":
-        amount_group_by = 5
-    elif metric == "request_latency_summary":
-        amount_group_by = 500
+    amount_group_by = 5
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
     df["time"] = df["time_group"].dt.strftime("%H:%M:%S")
-    df["amount"] = pd.to_numeric(df["amount"], errors='coerce')
+    df["amount"] = pd.to_numeric(df["amount"], errors="coerce")
     df["amount_agg"] = (df["amount"] // amount_group_by) * amount_group_by
 
     df["count"] = 1
@@ -127,7 +122,8 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df_all_combinations = pd.DataFrame(index=index).reset_index()
 
     df_merged = df_all_combinations.merge(df_agg, on=["time", "amount_agg"], how="left")
-    df_merged.loc[:, 'normalized_count'] = df_merged['normalized_count'].fillna(0)
+    df_merged.loc[:, "normalized_count"] = df_merged["normalized_count"].fillna(0)
+    df_merged["normalized_count"] = df_merged["normalized_count"].clip(lower=0)
 
     # plot heatmap
     ds = hv.Dataset(data=df_merged, kdims=["time", "amount_agg"], vdims=["normalized_count"])
@@ -136,6 +132,8 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     cmap = ["black", "red", "orange", "yellow"]
     cmap = LinearSegmentedColormap.from_list("cmap", cmap)
     labels = get_graph_labels("", metric)
+    y_ticks = list(range(0, int(df_merged["amount_agg"].max()) + 1, amount_group_by))
+
     heatmap.opts(
         opts.HeatMap(
             **labels,
@@ -144,6 +142,7 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
             width=800,
             toolbar="above",
             cmap=cmap,
+            yticks=y_ticks
         )
     )
 
@@ -193,7 +192,7 @@ def get_pairplot_labels(metric: str, amount: pd.Series, uid: pd.Series) -> pd.Da
     return pd.DataFrame(labels)
 
 
-def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool) -> None:
+def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool, for_each_route: bool = False) -> None:
     """Generate a pairplot Matrix (SPLOM) for exploring relationships between multiple metrics in the given dataset.
        https://seaborn.pydata.org/generated/seaborn.pairplot.html
 
@@ -201,6 +200,7 @@ def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool
         data (List[dict[str, Any]]): The dataset as a list of dictionaries.
         metrics (List[str]): List of metric to be used in pairplot.
         show (bool): Flag indicating whether to display the pairplot or not.
+        for_each_route (bool) Flag indicating whether to make paiplot Figure for each route or 1 Figure for all routes.
 
     Returns:
         None
@@ -210,29 +210,63 @@ def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool
 
     sns.set(style="ticks", color_codes=True)
 
-    labels = []
-    for metric in metrics:
-        filtered_df = df[df["type"] == metric]
-        filtered_df.reset_index(drop=True, inplace=True)
-        labels_metric = get_pairplot_labels(metric, filtered_df["amount"], filtered_df["uid"])
-        labels.append(labels_metric)
+    if for_each_route:
+        for route in df["uid"].unique():
+            route_df = df[df["uid"] == route]
+            labels = []
 
-    combined_df = pd.concat(labels)
+            for metric in metrics:
+                filtered_df = route_df[route_df["type"] == metric]
+                filtered_df.reset_index(drop=True, inplace=True)
+                labels_metric = get_pairplot_labels(metric, filtered_df["amount"], filtered_df["uid"])
+                labels.append(labels_metric)
 
-    sns.set(rc={'figure.figsize': (5, 5)})
-    sns.set_context("paper", rc={"axes.labelsize": 6})
-    pairplot = sns.pairplot(combined_df, aspect=0.5, hue='Routes')
+            combined_df = pd.concat(labels)
 
-    for ax in pairplot.axes.flatten():
-        ax.tick_params(axis='x', labelsize=6)
-        ax.tick_params(axis='y', labelsize=6)
-        ax.locator_params(axis='x', nbins=3)
-        ax.locator_params(axis='y', nbins=3)
+            sns.set(rc={"figure.figsize": (5, 5)})
+            sns.set_context("paper", rc={"axes.labelsize": 6})
+            pairplot = sns.pairplot(combined_df, aspect=0.5)
+            pairplot.fig.legend(labels=[route])
 
-    if show:
-        plt.show()
+            for ax in pairplot.axes.flatten():
+                ax.tick_params(axis="x", labelsize=6)
+                ax.tick_params(axis="y", labelsize=6)
+                ax.locator_params(axis="x", nbins=3)
+                ax.locator_params(axis="y", nbins=3)
 
-    pairplot.savefig(f"{output_dir}pairplot.png")
+            if show:
+                plt.show()
+
+            if not route == "/":
+                filename = f"{output_dir}pairplit_{route.lstrip('/').replace('/', '_')}.svg"
+            else:
+                filename = f"{output_dir}pairplot_root.svg"
+
+            pairplot.savefig(filename, format="svg")
+    else:
+        labels = []
+        for metric in metrics:
+            filtered_df = df[df["type"] == metric]
+            filtered_df.reset_index(drop=True, inplace=True)
+            labels_metric = get_pairplot_labels(metric, filtered_df["amount"], filtered_df["uid"])
+            labels.append(labels_metric)
+
+        combined_df = pd.concat(labels)
+
+        sns.set(rc={"figure.figsize": (5, 5)})
+        sns.set_context("paper", rc={"axes.labelsize": 6})
+        pairplot = sns.pairplot(combined_df, aspect=0.5, hue="Routes")
+
+        for ax in pairplot.axes.flatten():
+            ax.tick_params(axis="x", labelsize=6)
+            ax.tick_params(axis="y", labelsize=6)
+            ax.locator_params(axis="x", nbins=3)
+            ax.locator_params(axis="y", nbins=3)
+
+        if show:
+            plt.show()
+
+        pairplot.savefig(f"{output_dir}pairplot.svg", format="svg")
 
 
 def get_graph_labels(route, metric) -> Union[dict[str, str], None]:
@@ -322,7 +356,7 @@ def generate_line_graph(
 
         filename = f"{output_dir}{metric}_all_routes.svg"
 
-        plt.savefig(filename, format='svg')
+        plt.savefig(filename, format="svg")
 
         if show:
             plt.show()
@@ -347,7 +381,7 @@ def generate_line_graph(
             else:
                 filename = f"{output_dir}{metric}_root.svg"
 
-            plt.savefig(filename, format='svg')
+            plt.savefig(filename, format="svg")
 
             if show:
                 plt.show()
@@ -435,7 +469,8 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
             "fs_write",
             "voluntary_context_switches"
         ],
-        show
+        show,
+        True
     )
 
     perun_log.minor_info("Generating heatmaps...")
