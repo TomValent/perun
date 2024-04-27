@@ -237,8 +237,7 @@ def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool
 
             sns.set(rc={"figure.figsize": (5, 5)})
             sns.set_context("paper", rc={"axes.labelsize": 6})
-            pairplot = sns.pairplot(combined_df, aspect=0.5)
-            pairplot.fig.legend(labels=[route])
+            pairplot = sns.pairplot(combined_df, aspect=0.5, hue="Routes")
 
             for ax in pairplot.axes.flatten():
                 ax.tick_params(axis="x", labelsize=6)
