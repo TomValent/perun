@@ -100,7 +100,12 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df = df[df["type"] == metric]
 
     # parse data
-    amount_group_by = 5
+    amount_group_by = 0
+
+    if metric == "memory_usage_counter":
+        amount_group_by = 5
+    elif metric == "request_latency_summary":
+        amount_group_by = 50
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
@@ -476,9 +481,9 @@ def web(profile: profile_factory.Profile, group_by: str, show: bool) -> None:
     perun_log.minor_info("Generating heatmaps...")
 
     generate_heatmap(sliced_data, "memory_usage_counter", show, group_by)
-    generate_heatmap(sliced_data, "request_latency_summary", show, group_by)
 
     generate_route_heatmap(sliced_data, "memory_usage_counter", show, group_by)
+    generate_route_heatmap(sliced_data, "request_latency_summary", show, group_by)
 
     if show:
         perun_log.minor_info("Generating call graph...")
