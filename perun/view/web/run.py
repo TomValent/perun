@@ -238,7 +238,7 @@ def generate_pairplot(data: List[dict[str, Any]], metrics: List[str], show: bool
                 plt.show()
 
             if not route == "/":
-                filename = f"{output_dir}pairplit_{route.lstrip('/').replace('/', '_')}.svg"
+                filename = f"{output_dir}pairplot_{route.lstrip('/').replace('/', '_')}.svg"
             else:
                 filename = f"{output_dir}pairplot_root.svg"
 
