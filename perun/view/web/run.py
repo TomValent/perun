@@ -5,6 +5,7 @@ import click
 import shlex
 import subprocess
 import webbrowser
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import holoviews as hv
@@ -107,12 +108,10 @@ def generate_heatmap(data: List[dict[str, Any]], metric: str, show: bool, group_
     df = df[df["type"] == metric]
 
     # parse data
-    amount_group_by = 0
+    num_bins = 6
 
-    if metric == "memory_usage_counter":
-        amount_group_by = 5
-    elif metric == "request_latency_summary":
-        amount_group_by = 50
+    bin_width = (df["amount"].max() - df["amount"].min()) / num_bins
+    amount_group_by = int(bin_width)
 
     df["timestamp"] = pd.to_datetime(df["timestamp"])
     df["time_group"] = df["timestamp"].dt.floor(group_by)
