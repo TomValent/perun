@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v3
@@ -36,6 +36,7 @@ jobs:
         uses: codecov/codecov-action@v3
         with:
           flags: coverage-${{ matrix.python-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}
           verbose: true
 
   # Tests that perun is buildable from distribution packages (this is precursor for pypi install).
@@ -57,10 +58,6 @@ jobs:
         run: |
           pip3 install -q build
           make release
-
-      - name: Install from dist (wheel)
-        run: |
-          pip3 install dist/*.whl
 
       - name: Install from dist (tar.gz)
         run: |
@@ -96,7 +93,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.9", "3.10", "3.11"]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
       - uses: actions/checkout@v3
@@ -128,4 +125,3 @@ jobs:
       - name: Check lint correctness for Python ${{ matrix.python-version }} using Tox
         run: |
           tox -e lint || true
-

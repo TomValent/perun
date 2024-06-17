@@ -1,9 +1,12 @@
 """Set of helper constants and helper named tuples for perun pcs"""
+
 from __future__ import annotations
 
 # Standard Imports
 from typing import Optional, Any, Iterable, Callable, Literal, TYPE_CHECKING
-import functools
+import array
+import contextlib
+import gc
 import importlib
 import itertools
 import operator
@@ -170,6 +173,23 @@ def str_to_plural(count: int, verb: str) -> str:
     return str(count) + " " + (verb + "s" if count != 1 else verb)
 
 
+def strtobool(value: str) -> bool:
+    """Convert a string representation of truth to True or False.
+    Taken from the source code of the `distutils` package that was deprecated in Python 3.10.
+    True values are 'y', 'yes', 't', 'true', 'on', and '1'.
+    False values are 'n', 'no', 'f', 'false', 'off', and '0'.
+    :param value: the truth value to convert.
+    :return: True or False depending on whether the value matches one of the truth strings.
+    :raises ValueError: if the value does not match any of the expected strings.
+    """
+    value = value.lower()
+    if value in ("y", "yes", "t", "true", "on", "1"):
+        return True
+    if value in ("n", "no", "f", "false", "off", "0"):
+        return False
+    raise ValueError(f"invalid truth value {value}")
+
+
 def format_counter_number(count: int, max_number: int) -> str:
     """Helper function that returns string formatted to number of places given by the length of max
     counter number.
@@ -297,6 +317,16 @@ def try_convert(value: Any, list_of_types: list[type]) -> Any:
     for checked_type in list_of_types:
         with SuppressedExceptions(Exception):
             return checked_type(value)
+
+
+def try_min(lhs: Optional[int | float], rhs: int | float) -> int | float:
+    """Returns minimum if lhs is not None
+
+    :param lhs: optional left side
+    :param rhs: right side
+    :return minimum of two numbers or right number
+    """
+    return rhs if lhs is None else min(lhs, rhs)
 
 
 def identity(*args: Any) -> Any:
@@ -438,85 +468,106 @@ def get_module(module_name: str) -> types.ModuleType:
     return MODULE_CACHE[module_name]
 
 
-MODULE_CACHE: dict[str, types.ModuleType] = {}
+def compact_convert_list_to_str(
+    number_list: list[int | float] | array.array[float] | array.array[int], float_precision: int = 2
+) -> list[str]:
+    """Converts list to list of compact strings
 
-
-@functools.cache
-def split_to_words(identifier: str) -> set[str]:
-    """Splits identifier of function into list of words
-
-    For simplicity, we assume, that identifier is in snake case, so camel case will not be split
-
-    :param identifier: identifier of function or other primitive, that consists of words
-    :return: list of words in identifier
+    :param number_list: list of numbers
+    :param float_precision: float precision of the numbers
+    :return list of compact strings
     """
-    return set(identifier.split("_"))
+    return [compact_convert_num_to_str(num, 2) for num in number_list]
 
 
-def switch_cost(lhs_identifier: str, rhs_identifier: str) -> float:
-    """Computes cost of switching lhs_identifier with rhs_identifier
+def compact_convert_num_to_str(number: int | float, float_precision: int = 2) -> str:
+    """Converts the number to the smallest string possible
 
-    The cost is computed as 1 - 2 * number of common words / (number of words in LHS + number of words in RHS)
-
-    :param lhs_identifier: left hand side identifier (function)
-    :param rhs_identifier: right hand side identifier (function)
-    :return: float cost of switching lhs with rhs
+    :param number: converted number
+    :param float_precision: float precision, i.e. number of decimal places in number
+    :return compact string
     """
-    lhs_words = split_to_words(lhs_identifier)
-    rhs_words = split_to_words(rhs_identifier)
-    return 1 - (2 * len(lhs_words.intersection(rhs_words)) / (len(lhs_words) + len(rhs_words)))
+    return str(to_compact_num(number, float_precision))
 
 
-DISTANCE_CACHE: dict[str, float] = {}
+def to_compact_num(number: int | float, float_precision: int = 2) -> int | float:
+    """Converts the number to the smallest string possible
 
-
-def compute_distance(
-    lhs_trace: list[dict[str, Any]],
-    rhs_trace: list[dict[str, Any]],
-    trace_key: str = "func",
-) -> float:
-    """Computes the distance between two traces
-
-    The distance is computed as least number of applications of following operations:
-
-      1. Match (cost = 0): matching parts of the traces, i.e. the same functions;
-      2. Insert/Delete (cost = 1): adding or deleting part of the trace, so the traces match
-      3. Substituion (cost = variable): switching part of the trace with another
-
-    This is based on [ISCSME'21] paper called:
-    Performance debugging in the large via mining millions of stack traces
-
-    We assume, that the inputs are in form of list which contains the dictionaries
-    with key "func" that corresponds to the name of the ids. One can change it using
-    the parameter "trace_key".
-
-    :param lhs_trace: lhs trace of function names
-    :param rhs_trace: rhs trace of function names
-    :param trace_key: key that is used for retrieving the trace names
-    :return: distance between two traces
+    :param number: converted number
+    :param float_precision: float precision, i.e. number of decimal places in number
+    :return compact num
     """
-    key = f"{','.join(l[trace_key] for l in lhs_trace)};{','.join(r[trace_key] for r in rhs_trace)}"
+    if isinstance(number, int):
+        return number
+    elif number.is_integer():
+        return int(number)
+    else:
+        return round(number, float_precision)
 
-    if key not in DISTANCE_CACHE.keys():
-        # We need to insert everything from RHS, hence full cost of what is in RHS
-        if len(lhs_trace) == 0:
-            cost = float(len(rhs_trace))
-        # We need to insert everything from LHS, hence full cost of what is in LHS
-        elif len(rhs_trace) == 0:
-            cost = float(len(lhs_trace))
-        # 1. First parts are matched in the trace, so the cost is the cost of matching the rest of the trace
-        elif lhs_trace[0][trace_key] == rhs_trace[0][trace_key]:
-            cost = compute_distance(lhs_trace[1:], rhs_trace[1:], trace_key)
-        # Else, we have to either try to insert/delete or switch functions
+
+@contextlib.contextmanager
+def disposable_resources(disposable: Any) -> Any:
+    """Helper context manager that disposes of the passed object
+
+    Disclaimers:
+      1) So far, we have no tangible proof this helps in any way, however, it could potentially,
+         reduce the memory peak of the application, if some huge file is kept in memory yet not
+         used anymore.
+      2) Usually, the GC is smarter than you, so it knows when it is the right time for collecting
+         this actually could increase some time (hopefully traded by the memory footprint)
+
+    :param disposable: object that should be disposed immediately
+    :return: object
+    """
+    try:
+        yield disposable
+    except Exception:
+        # Re-raise the encountered exception
+        raise
+    finally:
+        del disposable
+
+
+def binary_search(
+    values: list[Any], value: Any, low: int, high: int, key: Callable[[Any], Any] = lambda x: x
+) -> int:
+    """Classical binary search algorithm
+
+    Note: while bisect implements this functionality, for Python 3.9 it does not support
+       the key parameter, that is unfortunately needed here.
+
+    :param values: list of any values
+    :param value: value for which we are looking up the insertion point
+    :param key: key used for getting the key
+    :param low: left pivot
+    :param high: right pivot
+    :return: insertion point for the value in values
+    """
+    while low <= high:
+        mid = low + (high - low) // 2
+        if key(value) == key(values[mid]):
+            return mid + 1
+        elif key(value) > key(values[mid]):
+            low = mid + 1
         else:
-            # 2. We try Insertion/Deletion of the current functions, and add the cost of inserting/deleting
-            cost_delete_lhs = compute_distance(lhs_trace[1:], rhs_trace, trace_key) + 1
-            cost_delete_rhs = compute_distance(lhs_trace, rhs_trace[1:], trace_key) + 1
-            # 3. We try Switch of the current two functions add the switch cost and compute the rest of the distance
-            cost_switch = compute_distance(lhs_trace[1:], rhs_trace[1:], trace_key) + switch_cost(
-                lhs_trace[0][trace_key], rhs_trace[0][trace_key]
-            )
-            # We take the minimum of the computed costs
-            cost = min(cost_delete_lhs, cost_delete_rhs, cost_switch)
-        DISTANCE_CACHE[key] = cost
-    return DISTANCE_CACHE[key]
+            high = mid - 1
+    return low
+
+
+def add_to_sorted(
+    values: list[Any], value: Any, key: Callable[[Any], Any] = lambda x: x, max_pick: int = -1
+) -> None:
+    """Adds a value to sorted list; the list is sorted wrt key function
+
+    :param values: list of values of type T
+    :param value: value that is added to the list of values
+    :param key: function for addding to the value
+    :param max_pick: picks at maximum max_pick elements
+    """
+    insert_point = binary_search(values, value, 0, len(values) - 1, key)
+    values.insert(insert_point, value)
+    if max_pick >= 0 and len(values) > max_pick:
+        values.pop(0)
+
+
+MODULE_CACHE: dict[str, types.ModuleType] = {}

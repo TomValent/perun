@@ -3,6 +3,7 @@
 Store is a collection of helper functions that can be used to pack content, compute checksums,
 or load and store into the directories or filenames.
 """
+
 from __future__ import annotations
 
 # Standard Imports
@@ -258,7 +259,6 @@ def parse_changelog_line(line: str) -> tuple[DegradationInfo, str, str]:
     else:
         log.error(f"could not parse changelog line '{line}'")
         # Note: this is never executed and is only for typechecking
-        return DegradationInfo(PerformanceChange.Unknown, "", "", ""), "", ""
 
 
 def load_degradation_list_for(
@@ -347,7 +347,8 @@ def load_profile_from_handle(
 
     # Try to load the json, if there is issue with the profile
     try:
-        return Profile(json.loads(body))
+        with common_kit.disposable_resources(json.loads(body)) as json_profile:
+            return Profile(json_profile)
     except ValueError:
         raise IncorrectProfileFormatException(
             file_name, f"profile '{file_name}' is not in profile format"

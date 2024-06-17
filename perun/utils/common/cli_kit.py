@@ -3,6 +3,7 @@
 Contains functions for click api, for processing parameters from command line, validating keys,
 and returning default values.
 """
+
 from __future__ import annotations
 
 # Standard Imports
@@ -91,10 +92,10 @@ def process_resource_key_param(
     if param.human_readable_name in ("per_key", "through_key") and value == "snapshots":
         return value
     # Validate the keys, if it is one of the set
-    if hasattr(ctx, "parent") and ctx.parent is not None:
-        valid_keys = set(ctx.parent.params.get("profile", Profile()).all_resource_fields())
-    else:
-        valid_keys = set()
+    assert (
+        hasattr(ctx, "parent") and ctx.parent is not None
+    ), "The function expects `ctx` has parent"
+    valid_keys = set(ctx.parent.params.get("profile", Profile()).all_resource_fields())
     if value not in valid_keys:
         valid_keys_str = ", ".join(f"'{vk}'" for vk in valid_keys)
         raise click.BadParameter(f"'{value}' is not one of {valid_keys_str}.")
@@ -447,6 +448,22 @@ def lookup_minor_version_callback(_: click.Context, __: click.Option, value: str
     return value
 
 
+def lookup_list_of_profiles_callback(
+    ctx: click.Context, arg: click.Argument, value: tuple[str]
+) -> list[Profile]:
+    """Callback for lookup up list of profiles anywhere
+
+    :param ctx: context of the CLI
+    :param arg: passed argument
+    :param value: list of profiles
+    :return: list of profiles
+    """
+    profiles = []
+    for profile in value:
+        profiles.append(lookup_any_profile_callback(ctx, arg, profile))
+    return profiles
+
+
 def lookup_any_profile_callback(_: click.Context, __: click.Argument, value: str) -> Profile:
     """Callback for looking up any profile, i.e. anywhere (in index, in pending, etc.)
 
@@ -454,7 +471,7 @@ def lookup_any_profile_callback(_: click.Context, __: click.Argument, value: str
     :param __: param
     :param value: value of the profile parameter
     """
-    # TODO: only temporary
+    # TODO: only temporary??? The fuck is temporary here???
     profile_path = os.path.join(pcs.get_job_directory(), value)
     if metrics.is_enabled() and os.path.exists(profile_path):
         metrics.add_metric("profile size", os.stat(profile_path).st_size)
@@ -767,9 +784,11 @@ def generate_cli_dump(
             ),
             "config": {
                 "runtime": streams.yaml_to_string(config.runtime().data),
-                "local": ""
-                if ".perun" not in dump_directory
-                else streams.yaml_to_string(config.local(dump_directory).data),
+                "local": (
+                    ""
+                    if ".perun" not in dump_directory
+                    else streams.yaml_to_string(config.local(dump_directory).data)
+                ),
                 "global": streams.yaml_to_string(config.shared().data),
             },
             "context": ctx,

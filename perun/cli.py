@@ -38,6 +38,7 @@ the flexibility of Perun's usage.
 
 .. _Click: https://click.palletsprojects.com/en/latest/
 """
+
 from __future__ import annotations
 
 # Standard Imports
@@ -74,6 +75,7 @@ import perun.fuzz.factory as fuzz
 import perun.postprocess
 import perun.profile.helpers as profiles
 import perun.view
+import perun.view_diff
 
 
 DEV_MODE = False
@@ -650,6 +652,69 @@ def show(ctx: click.Context, profile: Profile, **_: Any) -> None:
 
 @cli.group()
 @click.argument(
+    "profile_list",
+    required=True,
+    nargs=2,
+    metavar="<profile>",
+    callback=cli_kit.lookup_list_of_profiles_callback,
+)
+@click.option(
+    "--minor",
+    "-m",
+    nargs=1,
+    default=None,
+    is_eager=True,
+    callback=cli_kit.lookup_minor_version_callback,
+    help="Finds the profiles in the index of minor version [HASH]",
+)
+@click.option(
+    "--offline",
+    "-o",
+    callback=cli_kit.set_config_option_from_flag(perun_config.runtime, "showdiff.offline"),
+    is_flag=True,
+    default=False,
+    help="Creates self-contained outputs usable in offline environments (default=False).",
+)
+@click.pass_context
+def showdiff(ctx: click.Context, **kwargs: Any) -> None:
+    """Interprets the difference of selected two profiles.
+
+    Looks up the given profiles and interprets it using the selected
+    visualization technique. Some of the techniques outputs either to
+    terminal (using ``ncurses``) or generates HTML files, which can be
+    browsable in the web browser (using ``bokeh`` library). Refer to concrete
+    techniques for concrete options and limitations.
+
+    The shown profiles will be looked up in the following steps:
+
+        1. If [PROFILE] is in form ``i@i`` (i.e, an `index tag`), then `ith`
+           record registered in the minor version <hash> index will be shown.
+
+        2. If [PROFILE] is in form ``i@p`` (i.e., an `pending tag`), then
+           `ith` profile stored in ``.perun/jobs`` will be shown.
+
+        3. [PROFILE] is looked-up within the minor version <hash> index for a
+           match. In case the <profile> is registered there, it will be shown.
+
+        4. [PROFILE] is looked-up within the ``.perun/jobs`` directory. In case
+           there is a match, the found profile will be shown.
+
+        5. Otherwise, the directory is walked for any match. Each found match
+           is asked for confirmation by user.
+
+    Tags consider the sorted order as specified by the following option
+    :ckey:`format.sort_profiles_by`.
+
+    Example 1. The following command will show the difference first two profiles
+    registered at index of ``HEAD~1`` commit::
+
+        perun showdiff -m HEAD~1 0@i 1@i report
+    """
+    pass
+
+
+@cli.group()
+@click.argument(
     "profile",
     required=True,
     metavar="<profile>",
@@ -1175,6 +1240,7 @@ def init_unit_commands(lazy_init: bool = True) -> None:
     like e.g. show has different forms (raw, graphs, etc.).
     """
     for unit, cli_cmd, cli_arg in [
+        (perun.view_diff, showdiff, "showdiff"),
         (perun.view, show, "show"),
         (perun.postprocess, postprocessby, "postprocessby"),
         (perun.collect, collect, "collect"),
@@ -1225,7 +1291,7 @@ def launch_cli_safely() -> None:
         error_name = error_module + catched_exception.__class__.__name__
 
         reported_error = error_name + ": " + str(catched_exception)
-        perun_log.error(f"unexpected error: {reported_error}", recoverable=True)
+        perun_log.error_msg(f"unexpected error: {reported_error}")
         with exceptions.SuppressedExceptions(Exception):
             cli_kit.generate_cli_dump(reported_error, catched_exception, stdout_log, stderr_log)
 
@@ -1236,3 +1302,7 @@ def launch_cli() -> None:
         launch_cli_in_dev_mode()
     else:
         launch_cli_safely()
+
+
+if __name__ == "__main__":
+    launch_cli()

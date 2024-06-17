@@ -1,9 +1,9 @@
 """Collection of functions for running collectors and postprocessors"""
+
 from __future__ import annotations
 
 # Standard Imports
 from typing import Any, Iterable, Optional, TYPE_CHECKING, cast, Callable, overload
-import distutils.util as dutils
 import os
 import signal
 import time
@@ -15,17 +15,10 @@ import click
 # Perun Imports
 from perun.vcs import vcs_kit
 from perun.logic import commands, config, index, pcs
-from perun.utils import decorators, log, streams
+from perun.utils import log, streams
 from perun.utils.common import common_kit
 from perun.utils.exceptions import SignalReceivedException
 from perun.utils.external import commands as external_commands
-from perun.utils.common.common_kit import (
-    COLLECT_PHASE_CMD,
-    COLLECT_PHASE_COLLECT,
-    COLLECT_PHASE_POSTPROCESS,
-    COLLECT_PHASE_WORKLOAD,
-    ColorChoiceType,
-)
 from perun.utils.structs import (
     CollectStatus,
     Executable,
@@ -208,9 +201,9 @@ def run_phase_function(report: RunnerReport, phase: str) -> None:
     :param RunnerReport report: collective report about the run of the phase
     :param str phase: name of the phase/function that is run
     """
-    phase_function: Callable[
-        ..., tuple[CollectStatus | PostprocessStatus, str, dict[str, Any]]
-    ] = getattr(report.runner, phase, create_empty_pass(report.ok_status))
+    phase_function: Callable[..., tuple[CollectStatus | PostprocessStatus, str, dict[str, Any]]] = (
+        getattr(report.runner, phase, create_empty_pass(report.ok_status))
+    )
     runner_verb = report.runner_type[:-2]
     report.phase = phase
     try:
@@ -335,7 +328,7 @@ def run_collector(collector: Unit, job: Job) -> tuple[CollectStatus, dict[str, A
     try:
         collector_module = common_kit.get_module(f"perun.collect.{collector.name}.run")
     except ImportError:
-        log.error(f"{collector.name} collector does not exist", recoverable=True)
+        log.error_msg(f"{collector.name} collector does not exist")
         return CollectStatus.ERROR, {}
 
     # First init the collector by running the before phases (if it has)
@@ -344,9 +337,8 @@ def run_collector(collector: Unit, job: Job) -> tuple[CollectStatus, dict[str, A
 
     if not collection_report.is_ok():
         log.minor_fail(f"Collecting from {log.cmd_style(job.executable.cmd)}")
-        log.error(
+        log.error_msg(
             f"while collecting by {collector.name}: {collection_report.message}",
-            recoverable=True,
             raised_exception=collection_report.exception,
         )
     else:
@@ -401,10 +393,7 @@ def run_postprocessor(
     try:
         postprocessor_module = common_kit.get_module(f"perun.postprocess.{postprocessor.name}.run")
     except ImportError:
-        log.error(
-            f"{postprocessor.name} postprocessor does not exist",
-            recoverable=True,
-        )
+        log.error_msg(f"{postprocessor.name} postprocessor does not exist")
         return PostprocessStatus.ERROR, {}
 
     # First init the collector by running the before phases (if it has)
@@ -415,10 +404,7 @@ def run_postprocessor(
 
     if not postprocess_report.is_ok() or not prof:
         log.minor_fail(f"Postprocessing by {postprocessor.name}")
-        log.error(
-            f"while postprocessing by {postprocessor.name}: {postprocess_report.message}",
-            recoverable=True,
-        )
+        log.error_msg(f"while postprocessing by {postprocessor.name}: {postprocess_report.message}")
     else:
         log.minor_success(f"Postprocessing by {postprocessor.name}")
 
@@ -441,7 +427,9 @@ def store_generated_profile(prof: Profile, job: Job, profile_name: Optional[str]
     log.minor_status(
         "stored generated profile ", status=f"{log.path_style(os.path.relpath(full_profile_path))}"
     )
-    if dutils.strtobool(str(config.lookup_key_recursively("profiles.register_after_run", "false"))):
+    if common_kit.strtobool(
+        str(config.lookup_key_recursively("profiles.register_after_run", "false"))
+    ):
         # We either store the profile according to the origin, or we use the current head
         dst = prof.get("origin", pcs.vcs().get_minor_head())
         # FIXME: consider removing this

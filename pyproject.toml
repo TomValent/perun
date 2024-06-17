@@ -3,6 +3,7 @@ requires = [
     "meson-python >= 0.15.0",
     "meson >= 1.2.3",
     "patchelf >= 0.11.0",
+    "ninja >= 1.0",
     "wheel",
 ]
 build-backend = "mesonpy"
@@ -30,6 +31,7 @@ dependencies = [
     "meson-python>=0.15.0",
     "meson>=1.2.3",
     "ninja>=1.0",
+    "wheel>=0.43.0",
 
     # Other
     "psutil>=5.0.0",
@@ -44,7 +46,7 @@ dependencies = [
     # String / text utilities
     "Faker>=19.3",
     "ruamel.yaml>=0.17",
-    "Jinja2>=3.1",
+    "Jinja2>=3.1.4",
 
     # File analysis
     "python-magic>=0.4",
@@ -69,6 +71,9 @@ dependencies = [
 
     # Transitive dependencies that we need to limit for some reason
     "kiwisolver!=1.4.5", # matplotlib dep, 1.4.5 does not work when lazy-importing matplotlib
+
+    # Some of our dependencies still rely on distutils in 3.12, hence we need the setuptools package
+    "setuptools>=69.0; python_version >= '3.12'"
 ]
 dynamic = ["version"]
 
@@ -217,7 +222,7 @@ exclude_also = [
 target-version = [
     "py39",
     "py310",
-    "py311"
+    "py311",
+    "py312",
 ]
 line-length = 100
-

@@ -1,4 +1,5 @@
 """List of helper and globally used structures and named tuples"""
+
 from __future__ import annotations
 
 # Standard Imports
@@ -14,7 +15,7 @@ import signal
 # Perun Imports
 from perun.utils.common import common_kit
 from perun.utils.common.common_kit import ColorChoiceType, PROFILE_TRACKED, PROFILE_UNTRACKED
-from perun.utils.exceptions import SignalReceivedException
+from perun.utils.exceptions import SignalReceivedException, SuppressedExceptions
 
 if TYPE_CHECKING:
     import types
@@ -417,12 +418,9 @@ class OrderedEnum(Enum):
 
         :param args: additional element arguments
         """
-        try:
+        with SuppressedExceptions(TypeError):
             # attempt to initialize other parents in the hierarchy
             super().__init__(*args)
-        except TypeError:
-            # ignore -- there are no other parents
-            pass
         ordered = len(self.__class__.__members__) + 1
         self.order = ordered
 
@@ -668,3 +666,20 @@ class HandledSignals:
             signal.signal(sig, sig_handler)
         # Re-raise exceptions not related to signal handling done by the CM (e.g., SignalReceivedE.)
         return isinstance(exc_val, self.handler_exc)
+
+
+class WebColorPalette:
+    """Colour palette for HTML/JS visualizations"""
+
+    Baseline: str = "rgba(49, 48, 77, 0.4)"
+    Target: str = "rgba(255, 201, 74, 0.4)"
+    Increase: str = "rgba(255, 0, 0, 0.7)"
+    Decrease: str = "rgba(0, 255, 0, 0.7)"
+    Equal: str = "rgba(0, 0, 255, 0.7)"
+    DarkTarget: str = "rgba(255, 201, 74, 1)"
+    DarkBaseline: str = "rgba(49, 48, 77, 1)"
+    DarkIncrease: str = "#ea5545"
+    DarkDecrease: str = "#87bc45"
+    DarkEqual: str = "#27aeef"
+    Highlight: str = "rgba(0, 0, 0, 0.7)"
+    NoHighlight: str = "rgba(0, 0, 0, 0.2)"
